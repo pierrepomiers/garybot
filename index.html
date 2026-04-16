@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>GaryBot · NOTOX</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:      #0a0f1a;
+  --bg2:     #111827;
+  --bg3:     #1e293b;
+  --border:  rgba(255,255,255,0.07);
+  --text:    #e2e8f0;
+  --muted:   #64748b;
+  --accent:  #f59e0b;
+  --blue:    #3b82f6;
+  --green:   #4ade80;
+  --red:     #f87171;
+  --orange:  #fb923c;
+  --mono:    'Space Mono', monospace;
+  --sans:    'DM Sans', sans-serif;
+}
+html,body { height:100%; background:var(--bg); color:var(--text); font-family:var(--sans); }
+a { color:inherit; text-decoration:none; }
+button { cursor:pointer; font-family:var(--sans); }
+input,select,textarea { font-family:var(--sans); }
+
+/* ── HEADER ── */
+header {
+  position:sticky; top:0; z-index:100;
+  background:rgba(10,15,26,0.96); backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--border);
+  padding:11px 14px; display:flex; align-items:center; justify-content:space-between;
+}
+.logo { font-family:var(--mono); font-size:15px; font-weight:700; color:var(--accent); letter-spacing:.08em; }
+.logo span { color:var(--muted); font-weight:400; }
+.header-right { display:flex; align-items:center; gap:8px; }
+.sync-btn {
+  background:rgba(59,130,246,.15); border:1px solid rgba(59,130,246,.3);
+  color:#93c5fd; padding:5px 11px; border-radius:99px; font-size:12px; font-family:var(--mono);
+}
+.sync-btn:disabled { opacity:.4; }
+.user-badge { font-size:11px; color:var(--muted); font-family:var(--mono); background:var(--bg3); padding:4px 8px; border-radius:99px; }
+
+/* ── STATS ── */
+.stats-bar {
+  display:flex; gap:8px; padding:10px 14px; overflow-x:auto; scrollbar-width:none;
+  border-bottom:1px solid var(--border); background:var(--bg2);
+}
+.stats-bar::-webkit-scrollbar { display:none; }
+.stat-chip { flex-shrink:0; display:flex; align-items:center; gap:6px; background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:6px 10px; font-size:12px; font-family:var(--mono); }
+.stat-num { font-weight:700; font-size:15px; }
+
+/* ── TOOLBAR ── */
+.toolbar { padding:10px 14px; display:flex; gap:8px; background:var(--bg2); border-bottom:1px solid var(--border); }
+.search-input { flex:1; background:var(--bg3); border:1px solid var(--border); color:var(--text); padding:8px 12px; border-radius:8px; font-size:13px; outline:none; }
+.search-input:focus { border-color:rgba(59,130,246,.4); }
+.filter-select { background:var(--bg3); border:1px solid var(--border); color:var(--text); padding:8px 10px; border-radius:8px; font-size:12px; outline:none; min-width:90px; }
+
+/* ── ORDERS ── */
+.orders-container { padding:12px 12px 80px; display:flex; flex-direction:column; gap:10px; }
+
+/* ── ORDER CARD ── */
+.order-card { background:var(--bg2); border:1px solid var(--border); border-radius:12px; overflow:hidden; transition:border-color .2s; }
+.order-card.urgent { border-color:rgba(239,68,68,.35); }
+.order-card.complete { border-color:rgba(74,222,128,.25); }
+.order-card.in-progress { border-color:rgba(245,158,11,.2); }
+
+.card-header { padding:12px 14px; display:flex; align-items:flex-start; justify-content:space-between; gap:8px; cursor:pointer; user-select:none; }
+.card-ref { font-family:var(--mono); font-size:12px; color:var(--accent); font-weight:700; letter-spacing:.04em; }
+.card-client { font-size:15px; font-weight:600; margin-top:2px; }
+.card-meta { font-size:11px; color:var(--muted); font-family:var(--mono); margin-top:3px; display:flex; gap:8px; flex-wrap:wrap; }
+.urgent-badge { background:rgba(239,68,68,.15); color:var(--red); border:1px solid rgba(239,68,68,.3); padding:1px 6px; border-radius:99px; font-size:10px; font-family:var(--mono); }
+.card-right { display:flex; flex-direction:column; align-items:flex-end; gap:5px; flex-shrink:0; }
+.progress-badge { font-family:var(--mono); font-size:13px; font-weight:700; padding:3px 8px; border-radius:99px; }
+.p0   { background:rgba(100,116,139,.2);  color:var(--muted); }
+.p25  { background:rgba(59,130,246,.15);  color:#93c5fd; }
+.p50  { background:rgba(251,146,60,.15);  color:var(--orange); }
+.p75  { background:rgba(245,158,11,.15);  color:var(--accent); }
+.p100 { background:rgba(74,222,128,.15);  color:var(--green); }
+.expand-icon { font-size:10px; color:var(--muted); transition:transform .2s; }
+.expand-icon.open { transform:rotate(180deg); }
+
+.progress-bar-thin { height:3px; background:var(--bg3); border-radius:99px; overflow:hidden; margin:0 14px 10px; }
+.progress-fill { height:100%; border-radius:99px; transition:width .4s ease; }
+
+/* ── CARD BODY ── */
+.card-body { padding:0 10px 10px; display:flex; flex-direction:column; gap:4px; }
+
+.lines-summary { margin:0 10px 8px; background:rgba(255,255,255,.02); border-radius:8px; padding:8px 10px; border:1px solid var(--border); }
+.lines-title { font-size:10px; color:var(--muted); font-family:var(--mono); margin-bottom:4px; letter-spacing:.08em; }
+.line-item { font-size:12px; color:#94a3b8; padding:2px 0; }
+.line-item strong { color:var(--text); }
+
+/* ── META EDIT ROW ── */
+.meta-row { margin:0 10px 8px; display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+.meta-input { background:var(--bg3); border:1px solid var(--border); color:var(--text); padding:5px 8px; border-radius:6px; font-size:12px; outline:none; }
+.meta-input:focus { border-color:rgba(245,158,11,.4); }
+.meta-label { font-size:10px; color:var(--muted); font-family:var(--mono); }
+.priority-btn { font-size:11px; padding:3px 8px; border-radius:99px; border:1px solid rgba(255,255,255,.12); background:transparent; color:var(--muted); font-family:var(--mono); }
+.priority-btn.urgent { background:rgba(239,68,68,.15); color:var(--red); border-color:rgba(239,68,68,.3); }
+.priority-btn.normal { background:rgba(74,222,128,.1); color:var(--green); border-color:rgba(74,222,128,.25); }
+
+/* ── STEP ROW ── */
+.step-row { display:flex; flex-direction:column; gap:4px; padding:7px 10px; border-radius:8px; background:rgba(255,255,255,.02); border:1px solid transparent; transition:all .2s; }
+.step-row.done { background:rgba(74,222,128,.05); border-color:rgba(74,222,128,.15); }
+.step-row-top { display:flex; align-items:center; gap:6px; }
+.step-check { background:none; border:none; font-size:20px; line-height:1; padding:0; flex-shrink:0; transition:transform .15s; }
+.step-check:active { transform:scale(.85); }
+.step-label { font-family:var(--mono); font-size:12px; letter-spacing:.03em; flex:1; }
+.step-row.done .step-label { color:var(--green); }
+.step-row:not(.done) .step-label { color:#94a3b8; }
+
+.mail-btn { font-size:11px; padding:3px 8px; border-radius:99px; border:1px solid; font-family:var(--mono); text-decoration:none; display:inline-flex; align-items:center; gap:3px; flex-shrink:0; }
+.mail-client  { background:rgba(59,130,246,.1);  color:#93c5fd;    border-color:rgba(59,130,246,.25); }
+.mail-fourn   { background:rgba(245,158,11,.1);  color:#fcd34d;    border-color:rgba(245,158,11,.25); }
+.mail-sent    { background:rgba(74,222,128,.1);  color:var(--green); border-color:rgba(74,222,128,.25); }
+.mail-relance { background:rgba(239,68,68,.1);   color:var(--red); border-color:rgba(239,68,68,.25); }
+
+.step-fourn-row { padding-left:32px; display:flex; flex-wrap:wrap; gap:5px; align-items:center; }
+.fourn-chip { font-size:11px; padding:2px 8px; border-radius:99px; border:1px solid rgba(255,255,255,.12); background:transparent; color:var(--muted); font-family:var(--mono); }
+.fourn-chip.selected { background:rgba(245,158,11,.15); color:#fcd34d; border-color:rgba(245,158,11,.4); }
+.no-email-warn { font-size:10px; color:var(--red); font-family:var(--mono); }
+
+.livraison-info { padding-left:32px; font-size:12px; color:var(--muted); display:flex; flex-direction:column; gap:3px; }
+.livraison-info .addr { color:var(--text); font-weight:500; }
+.livraison-toggle { display:flex; gap:6px; margin-bottom:4px; }
+.type-btn { font-size:11px; padding:2px 8px; border-radius:99px; border:1px solid rgba(255,255,255,.12); background:transparent; color:var(--muted); font-family:var(--mono); }
+.type-btn.active { background:rgba(163,230,53,.15); color:#a3e635; border-color:rgba(163,230,53,.3); }
+
+/* ── ARCHIVE BANNER ── */
+.archive-banner {
+  margin:0 10px 8px; padding:8px 12px; border-radius:8px;
+  background:rgba(74,222,128,.08); border:1px solid rgba(74,222,128,.2);
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+}
+.archive-banner-text { font-size:12px; color:var(--green); font-family:var(--mono); }
+.archive-confirm-btn {
+  font-size:11px; padding:3px 10px; border-radius:99px;
+  background:rgba(74,222,128,.15); border:1px solid rgba(74,222,128,.3);
+  color:var(--green); font-family:var(--mono);
+}
+.archive-cancel-btn {
+  font-size:11px; padding:3px 10px; border-radius:99px;
+  background:rgba(239,68,68,.1); border:1px solid rgba(239,68,68,.2);
+  color:var(--red); font-family:var(--mono);
+}
+
+/* ── LOGIN ── */
+#login-screen { flex:1; display:flex; align-items:center; justify-content:center; padding:24px; }
+.login-box { width:100%; max-width:360px; background:var(--bg2); border:1px solid var(--border); border-radius:16px; padding:32px 24px; }
+.login-logo { font-family:var(--mono); font-size:22px; color:var(--accent); font-weight:700; letter-spacing:.1em; margin-bottom:4px; }
+.login-sub { font-size:13px; color:var(--muted); margin-bottom:28px; }
+.form-group { margin-bottom:14px; }
+.form-label { font-size:11px; color:var(--muted); font-family:var(--mono); letter-spacing:.06em; margin-bottom:5px; display:block; }
+.form-input { width:100%; background:var(--bg3); border:1px solid var(--border); color:var(--text); padding:10px 12px; border-radius:8px; font-size:14px; outline:none; transition:border-color .2s; }
+.form-input:focus { border-color:rgba(245,158,11,.4); }
+.btn-primary { width:100%; background:var(--accent); color:#000; padding:11px; border:none; border-radius:8px; font-size:14px; font-weight:600; margin-top:8px; }
+.btn-primary:disabled { opacity:.4; }
+.error-msg { font-size:12px; color:var(--red); margin-top:8px; text-align:center; font-family:var(--mono); }
+
+/* ── SETTINGS ── */
+#settings-screen { flex:1; padding:16px; max-width:600px; margin:0 auto; width:100%; }
+.settings-title { font-family:var(--mono); font-size:14px; color:var(--accent); margin-bottom:16px; letter-spacing:.06em; }
+.settings-section { background:var(--bg2); border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:12px; }
+.section-title { font-size:11px; color:var(--muted); font-family:var(--mono); letter-spacing:.08em; margin-bottom:12px; }
+.fourn-row { display:flex; align-items:center; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
+.fourn-name { font-family:var(--mono); font-size:12px; color:var(--accent); min-width:80px; }
+.btn-save { background:rgba(245,158,11,.15); border:1px solid rgba(245,158,11,.3); color:#fcd34d; padding:8px 16px; border-radius:8px; font-size:13px; font-family:var(--mono); margin-top:8px; }
+.btn-danger { background:rgba(239,68,68,.1); border:1px solid rgba(239,68,68,.2); color:var(--red); padding:8px 16px; border-radius:8px; font-size:13px; font-family:var(--mono); }
+.btn-logout { background:rgba(100,116,139,.1); border:1px solid rgba(100,116,139,.2); color:var(--muted); padding:8px 16px; border-radius:8px; font-size:13px; font-family:var(--mono); }
+.purge-info { font-size:12px; color:var(--muted); margin-bottom:10px; line-height:1.5; }
+
+/* ── NAV ── */
+nav { position:fixed; bottom:0; left:0; right:0; background:rgba(10,15,26,.97); backdrop-filter:blur(12px); border-top:1px solid var(--border); display:flex; z-index:100; }
+nav button { flex:1; background:none; border:none; color:var(--muted); padding:10px 8px 14px; font-size:10px; font-family:var(--mono); display:flex; flex-direction:column; align-items:center; gap:3px; letter-spacing:.04em; }
+nav button.active { color:var(--accent); }
+nav button span { font-size:20px; }
+
+/* ── TOAST ── */
+.toast { position:fixed; bottom:80px; left:50%; transform:translateX(-50%); background:var(--bg3); border:1px solid var(--border); color:var(--text); padding:10px 18px; border-radius:99px; font-size:13px; font-family:var(--mono); z-index:999; animation:fadeUp .3s ease, fadeOut .3s ease 2.2s forwards; white-space:nowrap; }
+@keyframes fadeUp { from{opacity:0;transform:translateX(-50%) translateY(8px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
+@keyframes fadeOut { to{opacity:0} }
+
+/* ── LOADING ── */
+.loading { text-align:center; padding:48px 16px; color:var(--muted); font-family:var(--mono); font-size:13px; }
+.spinner { display:inline-block; width:24px; height:24px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; margin-bottom:12px; }
+@keyframes spin { to{transform:rotate(360deg)} }
+.empty-state { text-align:center; padding:64px 24px; color:var(--muted); }
+.empty-icon { font-size:48px; margin-bottom:12px; }
+.empty-text { font-family:var(--mono); font-size:13px; }
+</style>
+</head>
+<body>
+<div id="app" style="min-height:100vh;display:flex;flex-direction:column;"></div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════════════════
+// ⚠️  CONFIG — REMPLACER CES 4 VALEURS AVANT DE DÉPLOYER
+// ══════════════════════════════════════════════════════════════════════════════
+const CONFIG = {
+  supabaseUrl:  "https://omaszhtehrhpfwxqypxw.supabase.co",        // ex: https://xxxxx.supabase.co
+  supabaseKey:  "sb_publishable_cUXnyvOSZoMjYEKUwbPrZQ_mDfAVTPD",   // clé publique anon Supabase
+  backendUrl:   "https://garybot-api.onrender.com/",           // ex: https://garybot-api.onrender.com/
+  apiSecret:    "notox2026",           // même valeur que Render env var API_SECRET
+};
+
+// Délai avant archivage automatique après livraison cochée (en jours)
+const ARCHIVE_DELAY_DAYS = 3;
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ÉTAPES
+// ══════════════════════════════════════════════════════════════════════════════
+const STEPS = [
+  { id:"appro_blank",  label:"Appro. Blank",  fourn:["Viral","Atua","Ben"],         clientMail:false },
+  { id:"cmd_preshape", label:"Cmd. Preshape", fourn:["Viral","Atua","Ben"],         clientMail:false },
+  { id:"cmd_access",   label:"Cmd. Access.",  fourn:["Viral","FCS","Surf System"],  clientMail:false },
+  { id:"shape",        label:"Shape",         fourn:null, clientMail:true  },
+  { id:"deco",         label:"Déco",          fourn:null, clientMail:true  },
+  { id:"strat",        label:"Strat",         fourn:null, clientMail:true  },
+  { id:"pose_plugs",   label:"Pose Plugs",    fourn:null, clientMail:false },
+  { id:"poncage",      label:"Ponçage",       fourn:null, clientMail:true  },
+  { id:"finition",     label:"Finition",      fourn:null, clientMail:true  },
+  { id:"emballage",    label:"Emballage",     fourn:null, clientMail:true  },
+  { id:"livraison",    label:"Livraison",     fourn:null, clientMail:true, isLivraison:true },
+];
+
+// ══════════════════════════════════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════════════════════════════════
+let sb = null;
+let S = {
+  view:"login", user:null,
+  orders:[], steps:{}, meta:{}, fournisseurs:{},
+  expanded:new Set(),
+  search:"", filter:"all",
+  loading:false, syncing:false,
+  loginEmail:"", loginPass:"", loginError:"",
+  archivePending: new Set(), // order_ids en attente de confirmation archivage
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SUPABASE
+// ══════════════════════════════════════════════════════════════════════════════
+function initSB() { sb = supabase.createClient(CONFIG.supabaseUrl, CONFIG.supabaseKey); }
+
+async function sbGet(table, eq) {
+  let q = sb.from(table).select("*");
+  if (eq) q = q.eq(eq[0], eq[1]);
+  const { data, error } = await q;
+  if (error) throw error;
+  return data || [];
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// AUTH
+// ══════════════════════════════════════════════════════════════════════════════
+async function login(email, pass) {
+  const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+  if (error) throw error;
+  return data.user;
+}
+async function logout() {
+  await sb.auth.signOut();
+  S.user = null; S.view = "login"; render();
+}
+async function checkSession() {
+  const { data } = await sb.auth.getSession();
+  if (data.session?.user) { S.user = data.session.user; S.view = "orders"; await loadAll(); }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CHARGEMENT
+// ══════════════════════════════════════════════════════════════════════════════
+async function loadAll() {
+  S.loading = true; render();
+  await Promise.all([loadFournisseurs(), loadStepsAndMeta(), syncOdoo()]);
+  S.loading = false; render();
+}
+
+async function loadFournisseurs() {
+  const data = await sbGet("fournisseurs");
+  S.fournisseurs = {};
+  data.forEach(f => S.fournisseurs[f.name] = { email:f.email||"", phone:f.phone||"", contact:f.contact_nom||"", id:f.id });
+}
+
+async function loadStepsAndMeta() {
+  const [stepsData, metaData] = await Promise.all([sbGet("order_steps"), sbGet("order_meta")]);
+  S.steps = {};
+  stepsData.forEach(s => {
+    if (!S.steps[s.order_id]) S.steps[s.order_id] = {};
+    S.steps[s.order_id][s.step_id] = { done:s.done, fournisseur:s.fournisseur, mail_sent:s.mail_sent, mail_relance:s.mail_relance };
+  });
+  S.meta = {};
+  metaData.forEach(m => { S.meta[m.order_id] = { delivery_type:m.delivery_type, priority:m.priority, shaper:m.shaper, model:m.model, dimensions:m.dimensions, due_date:m.due_date, archived:m.archived, archived_at:m.archived_at }; });
+}
+
+async function syncOdoo() {
+  S.syncing = true; render();
+  try {
+    const resp = await fetch(`${CONFIG.backendUrl}/orders`, { headers:{ "x-api-secret":CONFIG.apiSecret } });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    S.orders = data.orders || [];
+    // Upsert meta pour nouvelles commandes
+    for (const o of S.orders) {
+      if (!S.meta[o.id]) {
+        await sb.from("order_meta").upsert({ order_id:o.id, order_name:o.name, delivery_type:"livraison", priority:"normal" }, { onConflict:"order_id" });
+        S.meta[o.id] = { delivery_type:"livraison", priority:"normal", archived:false };
+      }
+    }
+    // Vérifier archivages automatiques
+    await checkAutoArchive();
+  } catch(e) {
+    console.error(e);
+    showToast("⚠ Erreur sync Odoo : " + e.message);
+  }
+  S.syncing = false;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ARCHIVAGE AUTOMATIQUE
+// Déclenché quand livraison est cochée. Archivage effectif après ARCHIVE_DELAY_DAYS.
+// ══════════════════════════════════════════════════════════════════════════════
+async function checkAutoArchive() {
+  for (const o of S.orders) {
+    const meta = S.meta[o.id];
+    if (!meta || meta.archived) continue;
+    const livraisonStep = (S.steps[o.id] || {})["livraison"];
+    if (!livraisonStep?.done) continue;
+
+    // Récupérer la date de cochage depuis Supabase
+    const { data } = await sb.from("order_steps")
+      .select("done_at").eq("order_id", o.id).eq("step_id", "livraison").single();
+    if (!data?.done_at) continue;
+
+    const doneAt = new Date(data.done_at);
+    const diffDays = (Date.now() - doneAt.getTime()) / (1000 * 60 * 60 * 24);
+    if (diffDays >= ARCHIVE_DELAY_DAYS) {
+      // Archivage automatique
+      await archiveOrder(o.id, true);
+    } else {
+      // En attente — afficher la bannière de confirmation
+      S.archivePending.add(o.id);
+    }
+  }
+}
+
+async function archiveOrder(orderId, auto = false) {
+  S.meta[orderId] = { ...(S.meta[orderId] || {}), archived:true };
+  S.archivePending.delete(orderId);
+  const order = S.orders.find(o => o.id === orderId);
+  await sb.from("order_meta").upsert({ order_id:orderId, order_name:order?.name||"", archived:true }, { onConflict:"order_id" });
+  await logHistory(orderId, order?.name||"", null, "archived", auto ? "auto" : "manuel", "");
+  showToast(`📦 ${order?.name || "Commande"} archivée`);
+  render();
+}
+
+async function unarchiveOrder(orderId) {
+  S.meta[orderId] = { ...(S.meta[orderId] || {}), archived:false };
+  S.archivePending.delete(orderId);
+  const order = S.orders.find(o => o.id === orderId);
+  await sb.from("order_meta").upsert({ order_id:orderId, order_name:order?.name||"", archived:false }, { onConflict:"order_id" });
+  render();
+}
+
+async function purgeArchived() {
+  const archivedIds = Object.entries(S.meta).filter(([,v]) => v.archived).map(([k]) => parseInt(k));
+  if (!archivedIds.length) { showToast("Rien à purger"); return; }
+  for (const id of archivedIds) {
+    await sb.from("order_steps").delete().eq("order_id", id);
+    await sb.from("order_meta").delete().eq("order_id", id);
+  }
+  await loadStepsAndMeta();
+  S.orders = S.orders.filter(o => !archivedIds.includes(o.id));
+  showToast(`🗑 ${archivedIds.length} commande(s) purgée(s)`);
+  render();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ACTIONS ÉTAPES
+// ══════════════════════════════════════════════════════════════════════════════
+async function toggleStep(orderId, stepId, currentDone) {
+  const newDone = !currentDone;
+  if (!S.steps[orderId]) S.steps[orderId] = {};
+  S.steps[orderId][stepId] = { ...(S.steps[orderId][stepId]||{}), done:newDone };
+  render();
+  const order = S.orders.find(o => o.id === orderId);
+  await sb.from("order_steps").upsert({
+    order_id:orderId, order_name:order?.name||"", step_id:stepId,
+    done:newDone, fournisseur:S.steps[orderId][stepId]?.fournisseur||null,
+    mail_sent:S.steps[orderId][stepId]?.mail_sent||false,
+    mail_relance:S.steps[orderId][stepId]?.mail_relance||false,
+    updated_by:S.user.id,
+  }, { onConflict:"order_id,step_id" });
+  await logHistory(orderId, order?.name||"", stepId, newDone?"step_done":"step_undone", "", S.user.email||"");
+  // Si livraison cochée → préparer archivage
+  if (stepId === "livraison" && newDone) {
+    S.archivePending.add(orderId);
+    render();
+  }
+  if (stepId === "livraison" && !newDone) {
+    S.archivePending.delete(orderId);
+    render();
+  }
+}
+
+async function setFournisseur(orderId, stepId, fourn) {
+  if (!S.steps[orderId]) S.steps[orderId] = {};
+  S.steps[orderId][stepId] = { ...(S.steps[orderId][stepId]||{}), fournisseur:fourn };
+  render();
+  const order = S.orders.find(o => o.id === orderId);
+  await sb.from("order_steps").upsert({
+    order_id:orderId, order_name:order?.name||"", step_id:stepId,
+    done:S.steps[orderId][stepId]?.done||false, fournisseur:fourn,
+    mail_sent:S.steps[orderId][stepId]?.mail_sent||false,
+    mail_relance:S.steps[orderId][stepId]?.mail_relance||false,
+    updated_by:S.user.id,
+  }, { onConflict:"order_id,step_id" });
+}
+
+async function markMailSent(orderId, stepId, isRelance) {
+  if (!S.steps[orderId]) S.steps[orderId] = {};
+  const cur = S.steps[orderId][stepId] || {};
+  S.steps[orderId][stepId] = { ...cur, mail_sent:true, mail_relance:isRelance||cur.mail_relance };
+  render();
+  const order = S.orders.find(o => o.id === orderId);
+  await sb.from("order_steps").upsert({
+    order_id:orderId, order_name:order?.name||"", step_id:stepId,
+    done:cur.done||false, fournisseur:cur.fournisseur||null,
+    mail_sent:true, mail_relance:isRelance||cur.mail_relance||false,
+    updated_by:S.user.id,
+  }, { onConflict:"order_id,step_id" });
+  await logHistory(orderId, order?.name||"", stepId, isRelance?"mail_relance":"mail_sent", cur.fournisseur||"", S.user.email||"");
+}
+
+async function setDeliveryType(orderId, type) {
+  S.meta[orderId] = { ...(S.meta[orderId]||{}), delivery_type:type };
+  render();
+  const order = S.orders.find(o => o.id === orderId);
+  await sb.from("order_meta").upsert({ order_id:orderId, order_name:order?.name||"", delivery_type:type }, { onConflict:"order_id" });
+}
+
+async function setMeta(orderId, field, value) {
+  S.meta[orderId] = { ...(S.meta[orderId]||{}), [field]:value };
+  const order = S.orders.find(o => o.id === orderId);
+  await sb.from("order_meta").upsert({ order_id:orderId, order_name:order?.name||"", [field]:value }, { onConflict:"order_id" });
+}
+
+async function saveFournisseurs(newF) {
+  S.fournisseurs = newF;
+  for (const [name, val] of Object.entries(newF)) {
+    await sb.from("fournisseurs").upsert({ name, email:val.email, phone:val.phone, contact_nom:val.contact }, { onConflict:"name" });
+  }
+  showToast("✓ Fournisseurs sauvegardés"); render();
+}
+
+async function logHistory(orderId, orderName, stepId, action, value, userEmail) {
+  try {
+    await sb.from("order_history").insert({ order_id:orderId, order_name:orderName, step_id:stepId, action, value, user_email:userEmail, created_by:S.user?.id });
+  } catch(e) { console.warn("log history:", e); }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// HELPERS
+// ══════════════════════════════════════════════════════════════════════════════
+function getProgress(orderId) {
+  const steps = S.steps[orderId] || {};
+  return Math.round(STEPS.filter(s => steps[s.id]?.done).length / STEPS.length * 100);
+}
+function pClass(p) { return p===100?"p100":p>=75?"p75":p>=50?"p50":p>=25?"p25":"p0"; }
+function pColor(p) { return p===100?"#4ade80":p>=75?"#f59e0b":p>=50?"#fb923c":p>=25?"#3b82f6":"#334155"; }
+function fmtDate(s) { return s ? new Date(s).toLocaleDateString("fr-FR",{day:"2-digit",month:"2-digit",year:"2-digit"}) : ""; }
+function fmtAmount(n) { return n ? new Intl.NumberFormat("fr-FR",{style:"currency",currency:"EUR",maximumFractionDigits:0}).format(n) : ""; }
+function buildAddr(p) { if(!p) return ""; return [p.street,p.zip,p.city,p.country_id?.[1]].filter(Boolean).join(", "); }
+
+function buildMailtoFourn(email, fourn, order, stepLabel, isRelance) {
+  const ref = order.name||""; const client = order.partner_detail?.name||"";
+  const lines = (order.lines_detail||[]).map(l=>`  - ${l.product_id?.[1]||l.name} x${l.product_uom_qty}`).join("\n");
+  const subj = isRelance ? `RELANCE – Commande NOTOX ${ref} / ${stepLabel}` : `Commande NOTOX ${ref} – ${stepLabel}`;
+  const body = isRelance
+    ? `Bonjour ${fourn},\n\nNous revenons vers vous concernant notre commande NOTOX ${ref} (${stepLabel}) pour le client ${client}.\n\nMerci de nous confirmer la disponibilité et le délai.\n\nCordialement,\nÉquipe NOTOX / GREEN WAVE`
+    : `Bonjour ${fourn},\n\nVeuillez trouver ci-dessous notre commande ${ref} pour le client ${client}.\n\nDétail :\n${lines||"  (voir commande jointe)"}\n\nMerci de confirmer réception et délai.\n\nCordialement,\nÉquipe NOTOX / GREEN WAVE\nwww.notox.fr`;
+  return `mailto:${email}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
+}
+
+function buildMailtoClient(order, stepLabel, progress) {
+  const email = order.partner_detail?.email||""; const name = order.partner_detail?.name||""; const ref = order.name||"";
+  const subj = `Votre commande NOTOX ${ref} – Avancement ${progress}%`;
+  const body = progress===100
+    ? `Bonjour ${name},\n\nVotre commande NOTOX ${ref} est prête !\nNous vous contacterons pour organiser la livraison ou le retrait.\n\nCordialement,\nÉquipe NOTOX / GREEN WAVE\nwww.notox.fr`
+    : `Bonjour ${name},\n\nÉtat d'avancement de votre commande NOTOX ${ref} :\n\nÉtape en cours : ${stepLabel}\nProgression : ${progress}%\n\nNous vous tiendrons informé(e) de la suite.\n\nCordialement,\nÉquipe NOTOX / GREEN WAVE\nwww.notox.fr`;
+  return `mailto:${email}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
+}
+
+function showToast(msg) {
+  const t = document.createElement("div"); t.className="toast"; t.textContent=msg;
+  document.body.appendChild(t); setTimeout(()=>t.remove(), 2700);
+}
+
+function filteredOrders() {
+  let orders = S.orders.filter(o => !S.meta[o.id]?.archived);
+  if (S.search) { const q=S.search.toLowerCase(); orders=orders.filter(o=>(o.name||"").toLowerCase().includes(q)||(o.partner_detail?.name||"").toLowerCase().includes(q)); }
+  if (S.filter==="pending") orders=orders.filter(o=>getProgress(o.id)<100);
+  if (S.filter==="done")    orders=orders.filter(o=>getProgress(o.id)===100);
+  if (S.filter==="urgent")  orders=orders.filter(o=>S.meta[o.id]?.priority==="urgent");
+  // Trier : urgent en premier, puis par date
+  orders.sort((a,b) => {
+    const ap = S.meta[a.id]?.priority==="urgent" ? 0:1;
+    const bp = S.meta[b.id]?.priority==="urgent" ? 0:1;
+    if (ap!==bp) return ap-bp;
+    return new Date(b.date_order||0) - new Date(a.date_order||0);
+  });
+  return orders;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// RENDER
+// ══════════════════════════════════════════════════════════════════════════════
+function render() {
+  const app = document.getElementById("app");
+  if (!sb)             { app.innerHTML=`<div class="loading"><div class="spinner"></div><br>Init...</div>`; return; }
+  if (S.view==="login")    { app.innerHTML=renderLogin();              bindLogin();    return; }
+  if (S.view==="settings") { app.innerHTML=renderShell(renderSettings()); bindSettings(); return; }
+  app.innerHTML=renderShell(renderOrders());
+  bindOrders();
+}
+
+// ── LOGIN ──
+function renderLogin() {
+  return `<div id="login-screen"><div class="login-box">
+    <div class="login-logo">GARY<span>BOT</span></div>
+    <div class="login-sub">Gestion commandes · NOTOX</div>
+    <div class="form-group"><label class="form-label">EMAIL</label><input id="l-email" class="form-input" type="email" placeholder="vous@notox.fr" value="${S.loginEmail}"></div>
+    <div class="form-group"><label class="form-label">MOT DE PASSE</label><input id="l-pass" class="form-input" type="password" placeholder="••••••••"></div>
+    <button id="l-btn" class="btn-primary">Connexion</button>
+    ${S.loginError?`<div class="error-msg">${S.loginError}</div>`:""}
+  </div></div>`;
+}
+
+// ── SHELL ──
+function renderShell(content) {
+  return `
+  <header>
+    <div class="logo">GARY<span>BOT</span></div>
+    <div class="header-right">
+      <button class="sync-btn" id="sync-btn" ${S.syncing?"disabled":""}>${S.syncing?"⟳ Sync...":"⟳ Odoo"}</button>
+      <div class="user-badge">${S.user?.email?.split("@")[0]||""}</div>
+    </div>
+  </header>
+  <div style="flex:1;overflow-y:auto;">${content}</div>
+  <nav>
+    <button class="${S.view==="orders"?"active":""}" id="nav-orders"><span>📋</span>COMMANDES</button>
+    <button class="${S.view==="settings"?"active":""}" id="nav-settings"><span>⚙️</span>CONFIG</button>
+    <button id="nav-logout"><span>🚪</span>QUITTER</button>
+  </nav>`;
+}
+
+// ── ORDERS ──
+function renderOrders() {
+  const active   = S.orders.filter(o=>!S.meta[o.id]?.archived);
+  const archived = S.orders.filter(o=>S.meta[o.id]?.archived);
+  const pending  = active.filter(o=>getProgress(o.id)<100).length;
+  const done     = active.filter(o=>getProgress(o.id)===100).length;
+  const urgent   = active.filter(o=>S.meta[o.id]?.priority==="urgent").length;
+  const orders   = filteredOrders();
+
+  return `
+  <div class="stats-bar">
+    <div class="stat-chip"><span class="stat-num" style="color:var(--accent)">${active.length}</span> en cours</div>
+    <div class="stat-chip"><span class="stat-num" style="color:var(--orange)">${pending}</span> à finir</div>
+    <div class="stat-chip"><span class="stat-num" style="color:var(--green)">${done}</span> livrées</div>
+    ${urgent?`<div class="stat-chip"><span class="stat-num" style="color:var(--red)">${urgent}</span> urgentes</div>`:""}
+    ${archived.length?`<div class="stat-chip"><span class="stat-num" style="color:var(--muted)">${archived.length}</span> archivées</div>`:""}
+  </div>
+  <div class="toolbar">
+    <input class="search-input" id="search-input" placeholder="🔍 Ref, client..." value="${S.search}">
+    <select class="filter-select" id="filter-select">
+      <option value="all"     ${S.filter==="all"    ?"selected":""}>Toutes</option>
+      <option value="pending" ${S.filter==="pending"?"selected":""}>En cours</option>
+      <option value="done"    ${S.filter==="done"   ?"selected":""}>Livrées</option>
+      <option value="urgent"  ${S.filter==="urgent" ?"selected":""}>Urgentes</option>
+    </select>
+  </div>
+  <div class="orders-container">
+    ${S.loading
+      ? `<div class="loading"><div class="spinner"></div><br>Chargement...</div>`
+      : orders.length===0
+        ? `<div class="empty-state"><div class="empty-icon">🏄</div><div class="empty-text">Aucune commande</div></div>`
+        : orders.map(o=>renderCard(o)).join("")
+    }
+  </div>`;
+}
+
+function renderCard(order) {
+  const oid   = order.id;
+  const prog  = getProgress(oid);
+  const isExp = S.expanded.has(oid);
+  const meta  = S.meta[oid] || { delivery_type:"livraison", priority:"normal" };
+  const ship  = order.shipping_detail || order.partner_detail || {};
+  const part  = order.partner_detail || {};
+  const isUrgent = meta.priority==="urgent";
+  const isPending = S.archivePending.has(oid);
+
+  const cardClass = isUrgent?"urgent":prog===100?"complete":prog>0?"in-progress":"";
+
+  const linesHtml = (order.lines_detail||[]).slice(0,6).map(l=>
+    `<div class="line-item"><strong>${l.product_id?.[1]||l.name||"—"}</strong> × ${l.product_uom_qty} — ${fmtAmount(l.price_subtotal)}</div>`
+  ).join("") + (order.lines_detail?.length>6?`<div class="line-item" style="color:var(--muted)">+${order.lines_detail.length-6} autres...</div>`:"");
+
+  const archiveBanner = isPending ? `
+    <div class="archive-banner">
+      <span class="archive-banner-text">✅ Livraison cochée — archiver dans ${ARCHIVE_DELAY_DAYS}j ?</span>
+      <div style="display:flex;gap:6px;">
+        <button class="archive-confirm-btn" data-archive="${oid}">Archiver</button>
+        <button class="archive-cancel-btn" data-unarchive="${oid}">Annuler</button>
+      </div>
+    </div>` : "";
+
+  const metaRow = `
+    <div class="meta-row">
+      <span class="meta-label">Shaper</span>
+      <input class="meta-input" id="shaper-${oid}" placeholder="prénom" value="${meta.shaper||""}" style="width:90px" data-meta-field="shaper" data-oid="${oid}">
+      <span class="meta-label">Modèle</span>
+      <input class="meta-input" id="model-${oid}" placeholder="Fish 5'10" value="${meta.model||""}" style="width:100px" data-meta-field="model" data-oid="${oid}">
+      <button class="priority-btn ${isUrgent?"urgent":"normal"}" data-priority="${oid}">${isUrgent?"🔴 Urgent":"🟢 Normal"}</button>
+    </div>`;
+
+  const stepsHtml = STEPS.map(step => {
+    const check  = (S.steps[oid]||{})[step.id]||{};
+    const isDone = !!check.done;
+    const selF   = check.fournisseur||"";
+    const foEmail= selF?(S.fournisseurs[selF]?.email||""):"";
+    const mSent  = !!check.mail_sent;
+
+    let foHtml = "";
+    if (step.fourn) {
+      const chips = step.fourn.map(f=>
+        `<button class="fourn-chip${selF===f?" selected":""}" data-oid="${oid}" data-step="${step.id}" data-fourn="${f}">${f}</button>`
+      ).join("");
+      let mailHtml = "";
+      if (selF && foEmail) {
+        const href = buildMailtoFourn(foEmail, selF, order, step.label, false);
+        if (!mSent) {
+          mailHtml=`<a href="${href}" class="mail-btn mail-fourn" data-oid="${oid}" data-step="${step.id}" data-relance="false" onclick="window._mailSent(${oid},'${step.id}',false)">📨 Envoyer</a>`;
+        } else {
+          const hrefR = buildMailtoFourn(foEmail, selF, order, step.label, true);
+          mailHtml=`<span class="mail-btn mail-sent">✓ Envoyé</span><a href="${hrefR}" class="mail-btn mail-relance" onclick="window._mailSent(${oid},'${step.id}',true)">🔁 Relancer</a>`;
+        }
+      } else if (selF && !foEmail) {
+        mailHtml=`<span class="no-email-warn">⚠ email manquant</span>`;
+      }
+      foHtml=`<div class="step-fourn-row">${chips}${mailHtml}</div>`;
+    }
+
+    let clientHtml = "";
+    if (step.clientMail && isDone) {
+      clientHtml=`<a href="${buildMailtoClient(order, step.label, prog)}" class="mail-btn mail-client">✉ client</a>`;
+    }
+
+    let livrHtml = "";
+    if (step.isLivraison) {
+      const isRetrait = meta.delivery_type==="retrait";
+      const addr = buildAddr(ship);
+      livrHtml=`<div class="livraison-info">
+        <div class="livraison-toggle">
+          <button class="type-btn${!isRetrait?" active":""}" data-oid="${oid}" data-type="livraison">🚚 Livraison</button>
+          <button class="type-btn${isRetrait?" active":""}" data-oid="${oid}" data-type="retrait">📍 Retrait</button>
+        </div>
+        ${!isRetrait?`
+          ${addr?`<div class="addr">📍 ${addr}</div>`:""}
+          ${part.email?`<div>✉ ${part.email}</div>`:""}
+          ${(part.phone||part.mobile)?`<div>📞 ${part.phone||part.mobile}</div>`:""}
+        `:`<div style="color:#a3e635">✓ Retrait sur place</div>`}
+      </div>`;
+    }
+
+    return `<div class="step-row${isDone?" done":""}">
+      <div class="step-row-top">
+        <button class="step-check" data-oid="${oid}" data-step="${step.id}">${isDone?"✅":"☑️"}</button>
+        <span class="step-label">${step.label}</span>
+        ${clientHtml}
+      </div>
+      ${foHtml}${livrHtml}
+    </div>`;
+  }).join("");
+
+  return `<div class="order-card ${cardClass}">
+    <div class="card-header" data-toggle="${oid}">
+      <div>
+        <div class="card-ref">${order.name||"—"} ${isUrgent?'<span class="urgent-badge">URGENT</span>':""}</div>
+        <div class="card-client">${part.name||"—"}</div>
+        <div class="card-meta">
+          <span>${fmtAmount(order.amount_total)}</span>
+          <span>${fmtDate(order.date_order)}</span>
+          ${meta.due_date?`<span style="color:var(--accent)">📅 ${fmtDate(meta.due_date)}</span>`:""}
+          ${meta.shaper?`<span>✂ ${meta.shaper}</span>`:""}
+        </div>
+      </div>
+      <div class="card-right">
+        <div class="progress-badge ${pClass(prog)}">${prog}%</div>
+        <div class="expand-icon${isExp?" open":""}">▼</div>
+      </div>
+    </div>
+    <div class="progress-bar-thin"><div class="progress-fill" style="width:${prog}%;background:${pColor(prog)}"></div></div>
+    ${isExp?`
+      ${archiveBanner}
+      ${metaRow}
+      <div class="lines-summary">
+        <div class="lines-title">CONTENU COMMANDE</div>
+        ${linesHtml||'<div class="line-item">—</div>'}
+      </div>
+      <div class="card-body">${stepsHtml}</div>
+    `:""}
+  </div>`;
+}
+
+// ── SETTINGS ──
+function renderSettings() {
+  const archivedCount = S.orders.filter(o=>S.meta[o.id]?.archived).length;
+  const foRows = Object.entries(S.fournisseurs).map(([name,val])=>`
+    <div class="fourn-row">
+      <span class="fourn-name">${name}</span>
+      <input class="form-input" id="fo-email-${name}" placeholder="email" value="${val.email||""}" style="flex:1;min-width:140px">
+      <input class="form-input" id="fo-contact-${name}" placeholder="contact" value="${val.contact||""}" style="width:100px">
+    </div>`).join("");
+
+  return `<div id="settings-screen">
+    <div class="settings-title">⚙ CONFIGURATION</div>
+    <div class="settings-section">
+      <div class="section-title">FOURNISSEURS</div>
+      ${foRows}
+      <button class="btn-save" id="save-fourn-btn">Sauvegarder</button>
+    </div>
+    <div class="settings-section">
+      <div class="section-title">ARCHIVAGE</div>
+      <div class="purge-info">Les commandes sont archivées automatiquement ${ARCHIVE_DELAY_DAYS} jours après la livraison cochée. La purge les supprime définitivement de GaryBot (elles restent dans Odoo).</div>
+      ${archivedCount>0
+        ? `<div style="font-size:13px;color:var(--muted);margin-bottom:10px;">${archivedCount} commande(s) archivée(s) en attente de purge.</div>
+           <button class="btn-danger" id="purge-btn">🗑 Purger les archivées (${archivedCount})</button>`
+        : `<div style="font-size:13px;color:var(--muted);">Aucune commande archivée.</div>`
+      }
+    </div>
+    <div class="settings-section">
+      <div class="section-title">SESSION</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:12px;">Connecté : ${S.user?.email}</div>
+      <button class="btn-logout" id="logout-btn">Se déconnecter</button>
+    </div>
+  </div>`;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// BIND
+// ══════════════════════════════════════════════════════════════════════════════
+window._mailSent = (oid, stepId, isRelance) => setTimeout(()=>markMailSent(oid,stepId,isRelance), 300);
+
+function bindLogin() {
+  const btn=document.getElementById("l-btn"), emailEl=document.getElementById("l-email"), passEl=document.getElementById("l-pass");
+  const doLogin = async () => {
+    btn.disabled=true; btn.textContent="..."; S.loginError="";
+    try { S.user=await login(emailEl.value, passEl.value); S.loginEmail=emailEl.value; S.view="orders"; await loadAll(); }
+    catch(e) { S.loginError=e.message||"Erreur"; btn.disabled=false; btn.textContent="Connexion"; render(); }
+  };
+  btn.addEventListener("click", doLogin);
+  passEl.addEventListener("keydown", e=>{ if(e.key==="Enter") doLogin(); });
+}
+
+function bindNav() {
+  document.getElementById("nav-orders")?.addEventListener("click", ()=>{ S.view="orders"; render(); });
+  document.getElementById("nav-settings")?.addEventListener("click", ()=>{ S.view="settings"; render(); });
+  document.getElementById("nav-logout")?.addEventListener("click", logout);
+  document.getElementById("sync-btn")?.addEventListener("click", async()=>{ await syncOdoo(); render(); });
+}
+
+function bindOrders() {
+  bindNav();
+  document.getElementById("search-input")?.addEventListener("input", e=>{ S.search=e.target.value; render(); });
+  document.getElementById("filter-select")?.addEventListener("change", e=>{ S.filter=e.target.value; render(); });
+
+  document.querySelectorAll("[data-toggle]").forEach(el=>el.addEventListener("click", ()=>{
+    const oid=parseInt(el.dataset.toggle);
+    S.expanded.has(oid)?S.expanded.delete(oid):S.expanded.add(oid); render();
+  }));
+  document.querySelectorAll(".step-check").forEach(btn=>btn.addEventListener("click", e=>{
+    e.stopPropagation();
+    const oid=parseInt(btn.dataset.oid), stepId=btn.dataset.step;
+    toggleStep(oid, stepId, (S.steps[oid]||{})[stepId]?.done||false);
+  }));
+  document.querySelectorAll(".fourn-chip").forEach(btn=>btn.addEventListener("click", e=>{
+    e.stopPropagation(); setFournisseur(parseInt(btn.dataset.oid), btn.dataset.step, btn.dataset.fourn);
+  }));
+  document.querySelectorAll("[data-type]").forEach(btn=>btn.addEventListener("click", e=>{
+    e.stopPropagation(); setDeliveryType(parseInt(btn.dataset.oid), btn.dataset.type);
+  }));
+  document.querySelectorAll("[data-priority]").forEach(btn=>btn.addEventListener("click", e=>{
+    e.stopPropagation();
+    const oid=parseInt(btn.dataset.priority);
+    const cur = S.meta[oid]?.priority||"normal";
+    setMeta(oid, "priority", cur==="urgent"?"normal":"urgent").then(()=>render());
+  }));
+  document.querySelectorAll("[data-meta-field]").forEach(input=>input.addEventListener("blur", ()=>{
+    setMeta(parseInt(input.dataset.oid), input.dataset.metaField, input.value);
+  }));
+  document.querySelectorAll("[data-archive]").forEach(btn=>btn.addEventListener("click", e=>{
+    e.stopPropagation(); archiveOrder(parseInt(btn.dataset.archive));
+  }));
+  document.querySelectorAll("[data-unarchive]").forEach(btn=>btn.addEventListener("click", e=>{
+    e.stopPropagation(); unarchiveOrder(parseInt(btn.dataset.unarchive));
+  }));
+}
+
+function bindSettings() {
+  bindNav();
+  document.getElementById("logout-btn")?.addEventListener("click", logout);
+  document.getElementById("purge-btn")?.addEventListener("click", async()=>{
+    if(confirm("Supprimer définitivement toutes les commandes archivées de GaryBot ?")) await purgeArchived();
+  });
+  document.getElementById("save-fourn-btn")?.addEventListener("click", async()=>{
+    const newF={};
+    for(const name of Object.keys(S.fournisseurs)) {
+      newF[name]={ email:document.getElementById(`fo-email-${name}`)?.value||"", phone:S.fournisseurs[name].phone||"", contact:document.getElementById(`fo-contact-${name}`)?.value||"" };
+    }
+    await saveFournisseurs(newF);
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// BOOT
+// ══════════════════════════════════════════════════════════════════════════════
+async function boot() { initSB(); render(); await checkSession(); render(); }
+boot();
+</script>
+</body>
+</html>
