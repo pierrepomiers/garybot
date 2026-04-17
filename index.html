@@ -210,7 +210,8 @@ const CONFIG = {
 };
 
 // Délai avant archivage automatique après livraison cochée (en jours)
-const ARCHIVE_DELAY_DAYS = 3;
+const ARCHIVE_DELAY_DAYS = 15;
+const PURGE_DELAY_DAYS = 30;
 
 // ══════════════════════════════════════════════════════════════════════════════
 // ÉTAPES
@@ -313,8 +314,9 @@ async function syncOdoo() {
         S.meta[o.id] = { delivery_type:"livraison", priority:"normal", archived:false };
       }
     }
-    // Vérifier archivages automatiques
+    // Vérifier archivages et purges automatiques
     await checkAutoArchive();
+    await checkAutoPurge();
   } catch(e) {
     console.error(e);
     showToast("⚠ Erreur sync Odoo : " + e.message);
@@ -351,10 +353,11 @@ async function checkAutoArchive() {
 }
 
 async function archiveOrder(orderId, auto = false) {
-  S.meta[orderId] = { ...(S.meta[orderId] || {}), archived:true };
+  const now = new Date().toISOString();
+  S.meta[orderId] = { ...(S.meta[orderId] || {}), archived:true, archived_at:now };
   S.archivePending.delete(orderId);
   const order = S.orders.find(o => o.id === orderId);
-  await sb.from("order_meta").upsert({ order_id:orderId, order_name:order?.name||"", archived:true }, { onConflict:"order_id" });
+  await sb.from("order_meta").upsert({ order_id:orderId, order_name:order?.name||"", archived:true, archived_at:now }, { onConflict:"order_id" });
   await logHistory(orderId, order?.name||"", null, "archived", auto ? "auto" : "manuel", "");
   showToast(`📦 ${order?.name || "Commande"} archivée`);
   render();
@@ -366,6 +369,25 @@ async function unarchiveOrder(orderId) {
   const order = S.orders.find(o => o.id === orderId);
   await sb.from("order_meta").upsert({ order_id:orderId, order_name:order?.name||"", archived:false }, { onConflict:"order_id" });
   render();
+}
+
+async function checkAutoPurge() {
+  const toPurge = [];
+  for (const [oid, meta] of Object.entries(S.meta)) {
+    if (!meta.archived || !meta.archived_at) continue;
+    const archivedAt = new Date(meta.archived_at);
+    const diffDays = (Date.now() - archivedAt.getTime()) / (1000 * 60 * 60 * 24);
+    if (diffDays >= PURGE_DELAY_DAYS) toPurge.push(parseInt(oid));
+  }
+  if (!toPurge.length) return;
+  for (const id of toPurge) {
+    await sb.from("order_steps").delete().eq("order_id", id);
+    await sb.from("order_meta").delete().eq("order_id", id);
+    delete S.meta[id];
+    delete S.steps[id];
+  }
+  S.orders = S.orders.filter(o => !toPurge.includes(o.id));
+  console.log(`Auto-purge: ${toPurge.length} commande(s) supprimée(s)`);
 }
 
 async function purgeArchived() {
@@ -562,20 +584,18 @@ function renderShell(content) {
 
 // ── ORDERS ──
 function renderOrders() {
-  const active   = S.orders.filter(o=>!S.meta[o.id]?.archived);
-  const archived = S.orders.filter(o=>S.meta[o.id]?.archived);
-  const pending  = active.filter(o=>getProgress(o.id)<100).length;
-  const done     = active.filter(o=>getProgress(o.id)===100).length;
-  const urgent   = active.filter(o=>S.meta[o.id]?.priority==="urgent").length;
-  const orders   = filteredOrders();
+  const active    = S.orders.filter(o=>!S.meta[o.id]?.archived);
+  const archived  = S.orders.filter(o=>S.meta[o.id]?.archived);
+  const enCours   = active.filter(o=>getProgress(o.id)<100).length;
+  const terminees = active.filter(o=>getProgress(o.id)===100).length;
+  const orders    = filteredOrders();
 
   return `
   <div class="stats-bar">
-    <div class="stat-chip"><span class="stat-num" style="color:var(--accent)">${active.length}</span> en cours</div>
-    <div class="stat-chip"><span class="stat-num" style="color:var(--orange)">${pending}</span> à finir</div>
-    <div class="stat-chip"><span class="stat-num" style="color:var(--green)">${done}</span> livrées</div>
-    ${urgent?`<div class="stat-chip"><span class="stat-num" style="color:var(--red)">${urgent}</span> urgentes</div>`:""}
-    ${archived.length?`<div class="stat-chip"><span class="stat-num" style="color:var(--muted)">${archived.length}</span> archivées</div>`:""}
+    <div class="stat-chip"><span class="stat-num" style="color:var(--accent)">${active.length}</span> actives</div>
+    <div class="stat-chip"><span class="stat-num" style="color:var(--orange)">${enCours}</span> en cours</div>
+    <div class="stat-chip"><span class="stat-num" style="color:var(--green)">${terminees}</span> terminées</div>
+    <div class="stat-chip"><span class="stat-num" style="color:var(--muted)">${archived.length}</span> livrées</div>
   </div>
   <div class="toolbar">
     <input class="search-input" id="search-input" placeholder="🔍 Ref, client..." value="${S.search}">
@@ -739,7 +759,7 @@ function renderSettings() {
     </div>
     <div class="settings-section">
       <div class="section-title">ARCHIVAGE</div>
-      <div class="purge-info">Les commandes sont archivées automatiquement ${ARCHIVE_DELAY_DAYS} jours après la livraison cochée. La purge les supprime définitivement de GaryBot (elles restent dans Odoo).</div>
+      <div class="purge-info">Les commandes sont archivées automatiquement ${ARCHIVE_DELAY_DAYS} jours après la livraison cochée, puis purgées automatiquement ${PURGE_DELAY_DAYS} jours après archivage. La purge les supprime définitivement de GaryBot (elles restent dans Odoo).</div>
       ${archivedCount>0
         ? `<div style="font-size:13px;color:var(--muted);margin-bottom:10px;">${archivedCount} commande(s) archivée(s) en attente de purge.</div>
            <button class="btn-danger" id="purge-btn">🗑 Purger les archivées (${archivedCount})</button>`
