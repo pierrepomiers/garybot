@@ -721,7 +721,8 @@ function renderCard(order) {
 
 // ── SETTINGS ──
 function renderSettings() {
-  const archivedCount = S.orders.filter(o=>S.meta[o.id]?.archived).length;
+  const archivedOrders = S.orders.filter(o=>S.meta[o.id]?.archived);
+  const archivedCount = archivedOrders.length;
   const foRows = Object.entries(S.fournisseurs).map(([name,val])=>`
     <div class="fourn-row">
       <span class="fourn-name">${name}</span>
@@ -743,6 +744,25 @@ function renderSettings() {
         ? `<div style="font-size:13px;color:var(--muted);margin-bottom:10px;">${archivedCount} commande(s) archivée(s) en attente de purge.</div>
            <button class="btn-danger" id="purge-btn">🗑 Purger les archivées (${archivedCount})</button>`
         : `<div style="font-size:13px;color:var(--muted);">Aucune commande archivée.</div>`
+      }
+    </div>
+    <div class="settings-section">
+      <div class="section-title">COMMANDES ARCHIVÉES</div>
+      ${archivedOrders.length===0
+        ? `<div style="font-size:13px;color:var(--muted);">Aucune commande archivée.</div>`
+        : archivedOrders.map(o => {
+            const p = o.partner_detail || {};
+            const prog = getProgress(o.id);
+            const archAt = S.meta[o.id]?.archived_at;
+            return `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border-radius:8px;background:rgba(255,255,255,.02);border:1px solid var(--border);margin-bottom:6px;">
+              <div style="flex:1;min-width:0;">
+                <div style="font-family:var(--mono);font-size:12px;color:var(--accent);font-weight:700;">${o.name||"—"}</div>
+                <div style="font-size:13px;color:var(--text);margin-top:1px;">${p.name||"—"}</div>
+                <div style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-top:2px;">${fmtAmount(o.amount_total)} · ${fmtDate(o.date_order)}${archAt ? ` · archivée ${fmtDate(archAt)}` : ""}</div>
+              </div>
+              <button class="btn-save" data-settings-unarchive="${o.id}" style="margin:0;padding:5px 12px;font-size:11px;white-space:nowrap;">↩ Désarchiver</button>
+            </div>`;
+          }).join("")
       }
     </div>
     <div class="settings-section">
@@ -819,6 +839,12 @@ function bindSettings() {
   document.getElementById("purge-btn")?.addEventListener("click", async()=>{
     if(confirm("Supprimer définitivement toutes les commandes archivées de GaryBot ?")) await purgeArchived();
   });
+  document.querySelectorAll("[data-settings-unarchive]").forEach(btn=>btn.addEventListener("click", async()=>{
+    const oid = parseInt(btn.dataset.settingsUnarchive);
+    await unarchiveOrder(oid);
+    showToast("↩ Commande désarchivée");
+    render();
+  }));
   document.getElementById("save-fourn-btn")?.addEventListener("click", async()=>{
     const newF={};
     for(const name of Object.keys(S.fournisseurs)) {
