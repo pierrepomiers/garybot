@@ -36,11 +36,14 @@ header {
   position:sticky; top:0; z-index:100;
   background:rgba(10,15,26,0.96); backdrop-filter:blur(12px);
   border-bottom:1px solid var(--border);
-  padding:10px 14px; display:flex; align-items:center; justify-content:space-between; gap:12px;
+  padding:10px 14px 10px 100px;
+  display:flex; align-items:center; justify-content:flex-end; gap:12px;
+  overflow:visible;
 }
-.logo-icon {
-  font-size:38px; line-height:1; flex-shrink:0;
-  filter:drop-shadow(0 2px 6px rgba(245,158,11,.25));
+.gary-logo {
+  position:absolute; left:10px; top:50%; transform:translateY(-50%);
+  height:78px; width:auto; z-index:101; pointer-events:none;
+  filter:drop-shadow(0 4px 12px rgba(0,0,0,.45));
 }
 .header-right {
   display:flex; flex-direction:column; gap:6px; align-items:stretch;
@@ -620,7 +623,7 @@ function renderShell(content) {
   const userName   = S.user?.email?.split("@")[0] || "";
   return `
   <header>
-    <div class="logo-icon" aria-label="GaryBot" title="GaryBot">🏄</div>
+    <img src="garybot_logo.png" alt="GaryBot" class="gary-logo" onerror="this.style.display='none'">
     <div class="header-right">
       <div class="header-row user-row">
         <div class="user-menu">
