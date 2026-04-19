@@ -36,11 +36,20 @@ header {
   position:sticky; top:0; z-index:100;
   background:rgba(10,15,26,0.96); backdrop-filter:blur(12px);
   border-bottom:1px solid var(--border);
-  padding:12px 14px; display:flex; align-items:center; justify-content:space-between; gap:8px;
+  padding:10px 14px; display:flex; align-items:center; justify-content:space-between; gap:12px;
 }
-.logo { font-family:var(--mono); font-size:17px; font-weight:700; color:var(--accent); letter-spacing:.08em; }
-.logo span { color:var(--muted); font-weight:400; }
-.header-right { display:flex; align-items:center; gap:6px; flex-wrap:nowrap; }
+.logo-icon {
+  font-size:38px; line-height:1; flex-shrink:0;
+  filter:drop-shadow(0 2px 6px rgba(245,158,11,.25));
+}
+.header-right {
+  display:flex; flex-direction:column; gap:6px; align-items:stretch;
+}
+.header-row { display:flex; align-items:center; gap:8px; }
+.header-row.user-row { justify-content:flex-end; }
+.header-row.sync-row { justify-content:center; }
+.header-row.nav-row  { justify-content:center; gap:10px; }
+.header-row.sync-row .sync-btn { width:100%; }
 .sync-btn {
   background:rgba(59,130,246,.15); border:1px solid rgba(59,130,246,.3);
   color:#bfdbfe; padding:6px 11px; border-radius:99px; font-size:13px; font-family:var(--mono); white-space:nowrap;
@@ -607,19 +616,25 @@ function renderShell(content) {
   const userName   = S.user?.email?.split("@")[0] || "";
   return `
   <header>
-    <div class="logo">GARY<span>BOT</span></div>
+    <div class="logo-icon" aria-label="GaryBot" title="GaryBot">🏄</div>
     <div class="header-right">
-      <button class="sync-btn" id="sync-btn" ${S.syncing?"disabled":""}>${S.syncing?"⟳ Sync...":"⟳ Odoo"}</button>
-      <button class="nav-icon-btn${isOrders?" active":""}" id="nav-orders" title="Commandes" aria-label="Commandes">📋</button>
-      <button class="nav-icon-btn${isSettings?" active":""}" id="nav-settings" title="Réglages" aria-label="Réglages">⚙️</button>
-      <div class="user-menu">
-        <button class="user-badge" id="user-badge-btn" aria-haspopup="true" aria-expanded="${S.userMenuOpen?"true":"false"}">
-          ${userName}<span class="caret">▾</span>
-        </button>
-        ${S.userMenuOpen ? `
-          <div class="user-dropdown" role="menu">
-            <button id="nav-logout" role="menuitem">🚪 Se déconnecter</button>
-          </div>` : ""}
+      <div class="header-row user-row">
+        <div class="user-menu">
+          <button class="user-badge" id="user-badge-btn" aria-haspopup="true" aria-expanded="${S.userMenuOpen?"true":"false"}">
+            ${userName}<span class="caret">▾</span>
+          </button>
+          ${S.userMenuOpen ? `
+            <div class="user-dropdown" role="menu">
+              <button id="nav-logout" role="menuitem">🚪 Se déconnecter</button>
+            </div>` : ""}
+        </div>
+      </div>
+      <div class="header-row sync-row">
+        <button class="sync-btn" id="sync-btn" ${S.syncing?"disabled":""}>${S.syncing?"⟳ Sync...":"⟳ Odoo"}</button>
+      </div>
+      <div class="header-row nav-row">
+        <button class="nav-icon-btn${isOrders?" active":""}" id="nav-orders" title="Commandes" aria-label="Commandes">📋</button>
+        <button class="nav-icon-btn${isSettings?" active":""}" id="nav-settings" title="Réglages" aria-label="Réglages">⚙️</button>
       </div>
     </div>
   </header>
