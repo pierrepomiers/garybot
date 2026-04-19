@@ -636,11 +636,11 @@ function renderShell(content) {
       ${S.userMenuOpen ? `
         <div class="main-menu" role="menu">
           <div class="menu-header">${userName||"—"}</div>
-          <button class="menu-item${isOrders?" active":""}" id="nav-orders" role="menuitem">📋 Commandes</button>
+          <button class="menu-item${isOrders?" active":""}" id="nav-orders" role="menuitem">✏️ Commandes</button>
           <button class="menu-item${isSettings?" active":""}" id="nav-settings" role="menuitem">⚙️ Réglages</button>
-          <button class="menu-item" id="sync-btn" role="menuitem" ${S.syncing?"disabled":""}>⟳ ${S.syncing?"Sync…":"Sync Odoo"}</button>
+          <button class="menu-item" id="sync-btn" role="menuitem" ${S.syncing?"disabled":""}>♻️ ${S.syncing?"Sync…":"Sync Odoo"}</button>
           <div class="menu-divider"></div>
-          <button class="menu-item danger" id="nav-logout" role="menuitem">🚪 Se déconnecter</button>
+          <button class="menu-item danger" id="nav-logout" role="menuitem">❌ Se déconnecter</button>
         </div>` : ""}
     </div>
   </header>
