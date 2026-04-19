@@ -546,6 +546,32 @@ async function saveFournisseurs(newF) {
   showToast("✓ Fournisseurs sauvegardés"); render();
 }
 
+async function downloadOrderPdf(orderId, orderName, btn) {
+  const label = orderName || orderId;
+  if (btn) { btn.disabled = true; btn.textContent = "⏳"; }
+  try {
+    const resp = await fetch(`${CONFIG.backendUrl}/orders/${orderId}/pdf`, {
+      headers: { "x-api-secret": CONFIG.apiSecret },
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `commande-${label}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    showToast(`📄 PDF ${label} téléchargé`);
+  } catch (e) {
+    console.error(e);
+    showToast("⚠ Erreur PDF : " + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = "📄"; }
+  }
+}
+
 async function logHistory(orderId, orderName, stepId, action, value, userEmail) {
   try {
     await sb.from("order_history").insert({ order_id:orderId, order_name:orderName, step_id:stepId, action, value, user_email:userEmail, created_by:S.user?.id });
@@ -792,6 +818,7 @@ function renderCard(order) {
           ${odooHref
             ? `<a class="card-ref" href="${odooHref}" target="_blank" rel="noopener noreferrer" data-stop-toggle="1">${order.name}</a>`
             : `<span class="card-ref">—</span>`}
+          <button class="pdf-btn" data-pdf-oid="${oid}" data-pdf-name="${order.name||oid}" title="Télécharger PDF" data-stop-toggle="1">📄</button>
           <span class="card-ref-meta">${fmtDate(order.date_order)} · ${fmtAmount(order.amount_total)}</span>
           ${isUrgent?'<span class="urgent-badge">URGENT</span>':""}
         </div>
@@ -939,6 +966,10 @@ function bindOrders() {
   }));
   document.querySelectorAll("[data-unarchive]").forEach(btn=>btn.addEventListener("click", e=>{
     e.stopPropagation(); unarchiveOrder(parseInt(btn.dataset.unarchive));
+  }));
+  document.querySelectorAll("[data-pdf-oid]").forEach(btn=>btn.addEventListener("click", e=>{
+    e.stopPropagation();
+    downloadOrderPdf(parseInt(btn.dataset.pdfOid), btn.dataset.pdfName, btn);
   }));
 }
 
