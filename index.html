@@ -124,7 +124,7 @@ header {
 .card-client { font-size:17px; font-weight:600; margin-top:6px; color:var(--text); }
 .card-meta { font-size:13px; color:var(--muted); font-family:var(--mono); margin-top:6px; display:flex; gap:10px; flex-wrap:wrap; }
 .urgent-badge { background:rgba(239,68,68,.18); color:var(--red); border:1px solid rgba(239,68,68,.35); padding:2px 7px; border-radius:99px; font-size:11px; font-family:var(--mono); }
-.card-right { display:flex; flex-direction:column; align-items:flex-end; gap:6px; flex-shrink:0; }
+.card-right { display:flex; flex-direction:row; align-items:center; gap:8px; flex-shrink:0; }
 .progress-badge { font-family:var(--mono); font-size:14px; font-weight:700; padding:4px 10px; border-radius:99px; }
 .p0   { background:rgba(248,113,113,.15); color:var(--red); }
 .p25  { background:rgba(248,113,113,.15); color:var(--red); }
@@ -795,7 +795,7 @@ function renderCard(order) {
       </div>
       <div class="card-right">
         <div class="progress-badge ${pClass(prog)}">${prog}%</div>
-        <div class="expand-icon${isExp?" open":""}">▼</div>
+        <div class="expand-icon${isExp?" open":""}" aria-hidden="true">▼</div>
       </div>
     </div>
     <div class="progress-bar-thin"><div class="progress-fill" style="width:${prog}%;background:${pColor(prog)}"></div></div>
