@@ -45,46 +45,42 @@ header {
   height:128px; width:auto; z-index:101; pointer-events:none;
   filter:drop-shadow(0 4px 12px rgba(0,0,0,.45));
 }
-.header-right {
-  display:flex; flex-direction:column; gap:6px; align-items:stretch;
-}
-.header-row { display:flex; align-items:center; gap:8px; }
-.header-row.user-row { justify-content:flex-end; }
-.header-row.sync-row { justify-content:center; }
-.header-row.nav-row  { justify-content:center; gap:10px; }
-.header-row.sync-row .sync-btn { width:100%; }
-.sync-btn {
-  background:rgba(59,130,246,.15); border:1px solid rgba(59,130,246,.3);
-  color:#bfdbfe; padding:6px 11px; border-radius:99px; font-size:13px; font-family:var(--mono); white-space:nowrap;
-}
-.sync-btn:disabled { opacity:.4; }
-.nav-icon-btn {
+.menu-wrap { position:relative; }
+.hamburger-btn {
   background:var(--bg3); border:1px solid var(--border); color:var(--text);
-  width:34px; height:34px; border-radius:99px; font-size:16px; display:inline-flex;
-  align-items:center; justify-content:center; padding:0; transition:all .15s;
+  width:42px; height:42px; border-radius:10px; padding:0;
+  display:inline-flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:4px; transition:all .15s;
 }
-.nav-icon-btn:hover { border-color:rgba(245,158,11,.3); }
-.nav-icon-btn.active { background:rgba(245,158,11,.15); border-color:rgba(245,158,11,.4); color:var(--accent); }
-.user-menu { position:relative; }
-.user-badge {
-  font-size:13px; color:var(--text); font-family:var(--mono);
-  background:var(--bg3); border:1px solid var(--border);
-  padding:6px 10px; border-radius:99px; display:inline-flex; align-items:center; gap:4px;
+.hamburger-btn:hover { border-color:rgba(245,158,11,.35); }
+.hamburger-btn[aria-expanded="true"] {
+  background:rgba(245,158,11,.15); border-color:rgba(245,158,11,.45); color:var(--accent);
 }
-.user-badge:hover { border-color:rgba(245,158,11,.3); }
-.user-badge .caret { font-size:10px; color:var(--muted); }
-.user-dropdown {
-  position:absolute; top:calc(100% + 6px); right:0;
-  background:var(--bg2); border:1px solid var(--border); border-radius:10px;
-  padding:4px; min-width:170px; z-index:200;
-  box-shadow:0 8px 24px rgba(0,0,0,.4);
+.hamburger-btn span {
+  display:block; width:20px; height:2px; background:currentColor; border-radius:2px;
 }
-.user-dropdown button {
+.main-menu {
+  position:absolute; top:calc(100% + 8px); right:0;
+  background:var(--bg2); border:1px solid var(--border); border-radius:12px;
+  padding:6px; min-width:220px; z-index:200;
+  box-shadow:0 12px 32px rgba(0,0,0,.5);
+}
+.menu-header {
+  padding:10px 12px; margin-bottom:4px;
+  border-bottom:1px solid var(--border);
+  font-family:var(--mono); font-size:12px; color:var(--muted);
+  letter-spacing:.06em; text-transform:lowercase; word-break:break-all;
+}
+.menu-item {
   width:100%; background:none; border:none; color:var(--text);
-  padding:10px 12px; border-radius:6px; font-size:13px; font-family:var(--mono);
-  text-align:left; display:flex; align-items:center; gap:8px;
+  padding:11px 12px; border-radius:8px; font-size:14px; font-family:var(--mono);
+  text-align:left; display:flex; align-items:center; gap:10px;
 }
-.user-dropdown button:hover { background:rgba(239,68,68,.12); color:var(--red); }
+.menu-item:hover { background:rgba(245,158,11,.1); }
+.menu-item.active { background:rgba(245,158,11,.15); color:var(--accent); }
+.menu-item.danger:hover { background:rgba(239,68,68,.12); color:var(--red); }
+.menu-item:disabled { opacity:.4; cursor:not-allowed; }
+.menu-divider { height:1px; background:var(--border); margin:4px 6px; }
 
 /* ── STATS ── */
 .stats-bar {
@@ -116,8 +112,17 @@ header {
 .order-card.in-progress { border-color:rgba(245,158,11,.2); }
 
 .card-header { padding:14px 16px; display:flex; align-items:flex-start; justify-content:space-between; gap:10px; cursor:pointer; user-select:none; }
-.card-ref { font-family:var(--mono); font-size:13px; color:var(--accent); font-weight:700; letter-spacing:.04em; }
-.card-client { font-size:17px; font-weight:600; margin-top:4px; color:var(--text); }
+.card-ref-row {
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  font-family:var(--mono); line-height:1.1;
+}
+.card-ref {
+  font-size:13px; color:var(--accent); font-weight:700; letter-spacing:.04em;
+  text-decoration:none; border-bottom:1px dashed rgba(245,158,11,.4);
+}
+.card-ref:hover { color:#fcd34d; border-bottom-color:rgba(245,158,11,.8); }
+.card-ref-meta { font-size:12px; color:var(--muted); font-weight:400; letter-spacing:.02em; }
+.card-client { font-size:17px; font-weight:600; margin-top:6px; color:var(--text); }
 .card-meta { font-size:13px; color:var(--muted); font-family:var(--mono); margin-top:6px; display:flex; gap:10px; flex-wrap:wrap; }
 .urgent-badge { background:rgba(239,68,68,.18); color:var(--red); border:1px solid rgba(239,68,68,.35); padding:2px 7px; border-radius:99px; font-size:11px; font-family:var(--mono); }
 .card-right { display:flex; flex-direction:column; align-items:flex-end; gap:6px; flex-shrink:0; }
@@ -258,6 +263,7 @@ const CONFIG = {
   supabaseKey:  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9tYXN6aHRlaHJocGZ3eHF5cHh3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyNjI1MDMsImV4cCI6MjA5MTgzODUwM30.Ze3QjjpgqRBEeJ-Q_2qpdq3EW2s8YIH0w1G2NotJx2Q",				// Supabase API key anon public
   backendUrl:   "https://garybot-api.onrender.com",	// Render web service URR
   apiSecret:    "notox2026",				// même valeur que Render env var API_SECRET
+  odooWebUrl:   "https://notoxsurf.odoo.com",		// URL de base de l'instance Odoo (lien clickable depuis la ref commande)
 };
 
 // Délai avant archivage automatique après livraison cochée (en jours)
@@ -624,25 +630,19 @@ function renderShell(content) {
   return `
   <header>
     <img src="garybot_logo.png" alt="GaryBot" class="gary-logo" onerror="this.style.display='none'">
-    <div class="header-right">
-      <div class="header-row user-row">
-        <div class="user-menu">
-          <button class="user-badge" id="user-badge-btn" aria-haspopup="true" aria-expanded="${S.userMenuOpen?"true":"false"}">
-            ${userName}<span class="caret">▾</span>
-          </button>
-          ${S.userMenuOpen ? `
-            <div class="user-dropdown" role="menu">
-              <button id="nav-logout" role="menuitem">🚪 Se déconnecter</button>
-            </div>` : ""}
-        </div>
-      </div>
-      <div class="header-row sync-row">
-        <button class="sync-btn" id="sync-btn" ${S.syncing?"disabled":""}>${S.syncing?"⟳ Sync...":"⟳ Odoo"}</button>
-      </div>
-      <div class="header-row nav-row">
-        <button class="nav-icon-btn${isOrders?" active":""}" id="nav-orders" title="Commandes" aria-label="Commandes">📋</button>
-        <button class="nav-icon-btn${isSettings?" active":""}" id="nav-settings" title="Réglages" aria-label="Réglages">⚙️</button>
-      </div>
+    <div class="menu-wrap">
+      <button class="hamburger-btn" id="menu-toggle" aria-haspopup="true" aria-expanded="${S.userMenuOpen?"true":"false"}" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
+      ${S.userMenuOpen ? `
+        <div class="main-menu" role="menu">
+          <div class="menu-header">${userName||"—"}</div>
+          <button class="menu-item${isOrders?" active":""}" id="nav-orders" role="menuitem">📋 Commandes</button>
+          <button class="menu-item${isSettings?" active":""}" id="nav-settings" role="menuitem">⚙️ Réglages</button>
+          <button class="menu-item" id="sync-btn" role="menuitem" ${S.syncing?"disabled":""}>⟳ ${S.syncing?"Sync…":"Sync Odoo"}</button>
+          <div class="menu-divider"></div>
+          <button class="menu-item danger" id="nav-logout" role="menuitem">🚪 Se déconnecter</button>
+        </div>` : ""}
     </div>
   </header>
   <div style="flex:1;overflow-y:auto;">${content}</div>`;
@@ -775,17 +775,24 @@ function renderCard(order) {
     </div>`;
   }).join("");
 
+  const odooHref = order.name ? `${CONFIG.odooWebUrl}/odoo/sales/${encodeURIComponent(order.name)}` : null;
+  const extraMeta = (meta.due_date || meta.shaper);
+
   return `<div class="order-card ${cardClass}">
     <div class="card-header" data-toggle="${oid}">
-      <div>
-        <div class="card-ref">${order.name||"—"} ${isUrgent?'<span class="urgent-badge">URGENT</span>':""}</div>
+      <div style="min-width:0;flex:1;">
+        <div class="card-ref-row">
+          ${odooHref
+            ? `<a class="card-ref" href="${odooHref}" target="_blank" rel="noopener noreferrer" data-stop-toggle="1">${order.name}</a>`
+            : `<span class="card-ref">—</span>`}
+          <span class="card-ref-meta">${fmtDate(order.date_order)} · ${fmtAmount(order.amount_total)}</span>
+          ${isUrgent?'<span class="urgent-badge">URGENT</span>':""}
+        </div>
         <div class="card-client">${part.name||"—"}</div>
-        <div class="card-meta">
-          <span>${fmtAmount(order.amount_total)}</span>
-          <span>${fmtDate(order.date_order)}</span>
+        ${extraMeta ? `<div class="card-meta">
           ${meta.due_date?`<span style="color:var(--accent)">📅 ${fmtDate(meta.due_date)}</span>`:""}
           ${meta.shaper?`<span>✂ ${meta.shaper}</span>`:""}
-        </div>
+        </div>` : ""}
       </div>
       <div class="card-right">
         <div class="progress-badge ${pClass(prog)}">${prog}%</div>
@@ -879,8 +886,11 @@ function bindNav() {
   document.getElementById("nav-orders")?.addEventListener("click", ()=>{ S.view="orders"; S.userMenuOpen=false; render(); });
   document.getElementById("nav-settings")?.addEventListener("click", ()=>{ S.view="settings"; S.userMenuOpen=false; render(); });
   document.getElementById("nav-logout")?.addEventListener("click", (e)=>{ e.stopPropagation(); S.userMenuOpen=false; logout(); });
-  document.getElementById("sync-btn")?.addEventListener("click", async()=>{ await syncOdoo(); render(); });
-  document.getElementById("user-badge-btn")?.addEventListener("click", (e)=>{
+  document.getElementById("sync-btn")?.addEventListener("click", async()=>{
+    S.userMenuOpen=false; render();
+    await syncOdoo(); render();
+  });
+  document.getElementById("menu-toggle")?.addEventListener("click", (e)=>{
     e.stopPropagation();
     S.userMenuOpen = !S.userMenuOpen;
     render();
@@ -892,7 +902,8 @@ function bindOrders() {
   document.getElementById("search-input")?.addEventListener("input", e=>{ S.search=e.target.value; render(); });
   document.getElementById("filter-select")?.addEventListener("change", e=>{ S.filter=e.target.value; render(); });
 
-  document.querySelectorAll("[data-toggle]").forEach(el=>el.addEventListener("click", ()=>{
+  document.querySelectorAll("[data-toggle]").forEach(el=>el.addEventListener("click", (e)=>{
+    if (e.target.closest("[data-stop-toggle]")) return;
     const oid=parseInt(el.dataset.toggle);
     S.expanded.has(oid)?S.expanded.delete(oid):S.expanded.add(oid); render();
   }));
@@ -949,7 +960,7 @@ function bindSettings() {
 // BOOT
 // ══════════════════════════════════════════════════════════════════════════════
 document.addEventListener("click", (e) => {
-  if (S.userMenuOpen && !e.target.closest(".user-menu")) {
+  if (S.userMenuOpen && !e.target.closest(".menu-wrap")) {
     S.userMenuOpen = false;
     render();
   }
