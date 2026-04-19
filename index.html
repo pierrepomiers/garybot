@@ -34,16 +34,15 @@ input,select,textarea { font-family:var(--sans); }
 /* ── HEADER ── */
 header {
   position:sticky; top:0; z-index:100;
-  background:rgba(10,15,26,0.96); backdrop-filter:blur(12px);
-  border-bottom:1px solid var(--border);
-  padding:10px 14px 10px 100px;
-  display:flex; align-items:center; justify-content:flex-end; gap:12px;
-  overflow:visible;
+  background:linear-gradient(to bottom, rgba(10,15,26,0.96) 0%, rgba(10,15,26,0) 100%);
+  padding:12px 14px 28px 110px;
+  display:flex; align-items:flex-start; justify-content:flex-end; gap:12px;
+  overflow:visible; border:none;
 }
 .gary-logo {
-  position:absolute; left:10px; top:50%; transform:translateY(-50%);
-  height:128px; width:auto; z-index:101; pointer-events:none;
-  filter:drop-shadow(0 4px 12px rgba(0,0,0,.45));
+  position:fixed; top:0; left:0;
+  height:90px; width:auto; z-index:101; pointer-events:none;
+  filter:drop-shadow(0 4px 12px rgba(0,0,0,.5));
 }
 .menu-wrap { position:relative; }
 .hamburger-btn {
