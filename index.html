@@ -320,6 +320,12 @@ header {
 .modal-body .field-input:focus, .modal-body .field-textarea:focus {
   border-color:rgba(59,130,246,.45);
 }
+.modal-info-banner {
+  background:rgba(59,130,246,.10); border:1px solid rgba(59,130,246,.35);
+  color:var(--text); border-radius:8px; padding:10px 12px;
+  font-size:13px; line-height:1.5;
+}
+.modal-info-banner b { color:var(--accent); font-weight:700; }
 .photo-picker {
   display:flex; flex-wrap:wrap; gap:8px;
 }
@@ -403,14 +409,14 @@ const STEPS = [
   { id:"appro_blank",  label:"Appro. Blank",  fourn:["Viral","Atua","Ben"],         clientMail:false },
   { id:"cmd_preshape", label:"Cmd. Preshape", fourn:["Viral","Atua","Ben"],         clientMail:false },
   { id:"cmd_access",   label:"Cmd. Access.",  fourn:["Viral","FCS","Surf System"],  clientMail:false },
-  { id:"shape",        label:"Shape",         fourn:null, clientMail:true  },
-  { id:"deco",         label:"Déco",          fourn:null, clientMail:true  },
-  { id:"strat",        label:"Strat",         fourn:null, clientMail:true  },
-  { id:"pose_plugs",   label:"Pose Plugs",    fourn:null, clientMail:false },
-  { id:"poncage",      label:"Ponçage",       fourn:null, clientMail:true  },
-  { id:"finition",     label:"Finition",      fourn:null, clientMail:true  },
-  { id:"emballage",    label:"Emballage",     fourn:null, clientMail:true  },
-  { id:"livraison",    label:"Livraison",     fourn:null, clientMail:true, isLivraison:true },
+  { id:"shape",        label:"shape",         fourn:null, clientMail:true  },
+  { id:"deco",         label:"déco",          fourn:null, clientMail:true  },
+  { id:"strat",        label:"stratification",fourn:null, clientMail:true  },
+  { id:"pose_plugs",   label:"pose Plugs",    fourn:null, clientMail:false },
+  { id:"poncage",      label:"ponçage",       fourn:null, clientMail:true  },
+  { id:"finition",     label:"finition",      fourn:null, clientMail:true  },
+  { id:"emballage",    label:"emballage",     fourn:null, clientMail:true  },
+  { id:"livraison",    label:"livraison",     fourn:null, clientMail:true, isLivraison:true },
 ];
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -481,7 +487,7 @@ async function loadStepsAndMeta() {
     S.steps[s.order_id][s.step_id] = { done:s.done, fournisseur:s.fournisseur, mail_sent:s.mail_sent, mail_relance:s.mail_relance };
   });
   S.meta = {};
-  metaData.forEach(m => { S.meta[m.order_id] = { delivery_type:m.delivery_type, priority:m.priority, dimensions:m.dimensions, due_date:m.due_date, archived:m.archived, archived_at:m.archived_at }; });
+  metaData.forEach(m => { S.meta[m.order_id] = { delivery_type:m.delivery_type, priority:m.priority, dimensions:m.dimensions, due_date:m.due_date, archived:m.archived, archived_at:m.archived_at, emails_sent:m.emails_sent || {} }; });
 }
 
 async function syncOdoo() {
@@ -494,8 +500,8 @@ async function syncOdoo() {
     // Upsert meta pour nouvelles commandes
     for (const o of S.orders) {
       if (!S.meta[o.id]) {
-        await sb.from("order_meta").upsert({ order_id:o.id, order_name:o.name, delivery_type:"livraison", priority:"normal" }, { onConflict:"order_id" });
-        S.meta[o.id] = { delivery_type:"livraison", priority:"normal", archived:false };
+        await sb.from("order_meta").upsert({ order_id:o.id, order_name:o.name, delivery_type:"livraison", priority:"normal", emails_sent:{} }, { onConflict:"order_id" });
+        S.meta[o.id] = { delivery_type:"livraison", priority:"normal", archived:false, emails_sent:{} };
       }
     }
     // Vérifier archivages et purges automatiques
@@ -657,6 +663,15 @@ async function setMeta(orderId, field, value) {
   await sb.from("order_meta").upsert({ order_id:orderId, order_name:order?.name||"", [field]:value }, { onConflict:"order_id" });
 }
 
+async function recordClientEmailSent(order, stepId) {
+  const prev = S.meta[order.id]?.emails_sent || {};
+  const emails_sent = { ...prev, [stepId]:new Date().toISOString() };
+  S.meta[order.id] = { ...(S.meta[order.id]||{}), emails_sent };
+  try {
+    await sb.from("order_meta").upsert({ order_id:order.id, order_name:order.name||"", emails_sent }, { onConflict:"order_id" });
+  } catch(e) { console.warn("emails_sent upsert:", e); }
+}
+
 async function saveFournisseurs(newF) {
   S.fournisseurs = newF;
   for (const [name, val] of Object.entries(newF)) {
@@ -707,6 +722,13 @@ function getProgress(orderId) {
 function pClass(p) { return p===100?"p100":p>=61?"p75":p>=31?"p50":"p25"; }
 function pColor(p) { return p===100?"#4ade80":p>=61?"#fbbf24":p>=31?"#fb923c":"#f87171"; }
 function fmtDate(s) { return s ? new Date(s).toLocaleDateString("fr-FR",{day:"2-digit",month:"2-digit",year:"2-digit"}) : ""; }
+function fmtDateTime(s) {
+  if (!s) return "";
+  const d = new Date(s);
+  const date = d.toLocaleDateString("fr-FR",{day:"2-digit",month:"2-digit",year:"numeric"});
+  const time = `${String(d.getHours()).padStart(2,"0")}h${String(d.getMinutes()).padStart(2,"0")}`;
+  return `${date} à ${time}`;
+}
 function fmtAmount(n) { return n ? new Intl.NumberFormat("fr-FR",{style:"currency",currency:"EUR",maximumFractionDigits:0}).format(n) : ""; }
 function buildAddr(p) { if(!p) return ""; return [p.street,p.zip,p.city,p.country_id?.[1]].filter(Boolean).join(", "); }
 
@@ -784,6 +806,11 @@ function openClientMessageModal(order, stepLabel, stepId, progress) {
   const { subject, body } = buildClientMessageDefaults(order, stepLabel, stepId, progress);
   const photos = []; // [{ name, data, dataUrl }]
 
+  const lastSentIso = stepId ? S.meta[order.id]?.emails_sent?.[stepId] : null;
+  const lastSentBanner = lastSentIso
+    ? `<div class="modal-info-banner">ℹ️ Un email <b>${escapeHtml(stepLabel)}</b> a déjà été envoyé le ${escapeHtml(fmtDateTime(lastSentIso))}. Vous pouvez quand même continuer.</div>`
+    : "";
+
   const overlay = document.createElement("div");
   overlay.className = "modal-overlay";
   overlay.innerHTML = `
@@ -799,6 +826,7 @@ function openClientMessageModal(order, stepLabel, stepId, progress) {
         <button class="modal-close" data-close aria-label="Fermer">×</button>
       </div>
       <div class="modal-body">
+        ${lastSentBanner}
         <div>
           <label class="field-label" for="msg-subject">Sujet</label>
           <input id="msg-subject" class="field-input" type="text" value="${escapeHtml(subject)}">
@@ -901,7 +929,10 @@ function openClientMessageModal(order, stepLabel, stepId, progress) {
       await resp.json().catch(() => ({}));
       close();
       showToast("✓ Message envoyé et archivé dans Odoo");
-      if (stepId) markMailSent(order.id, stepId, false);
+      if (stepId) {
+        markMailSent(order.id, stepId, false);
+        recordClientEmailSent(order, stepId);
+      }
     } catch (err) {
       console.error(err);
       sendBtn.disabled = false;
