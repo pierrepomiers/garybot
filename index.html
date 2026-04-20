@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="messages.js?v=1776690432"></script>
+<script src="messages.js?v=1776710726"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -753,7 +753,7 @@ function buildClientMessageDefaults(order, stepLabel, stepId, progress) {
 
   const subject = stepId === "livraison"
     ? `Commande NOTOX ${ref} – prête !`
-    : `Commande NOTOX ${ref} – ${stepLabel} ok (${progress}%)`;
+    : `Commande NOTOX ${ref} – ${stepLabel} en cour !`;
 
   // Bug historique : `const MESSAGES` dans messages.js N'EST PAS attaché
   // à window (seuls var/function le sont). Il faut donc tester via typeof
