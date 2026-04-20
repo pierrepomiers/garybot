@@ -310,7 +310,7 @@ header {
   font-family:var(--sans); transition:border-color .15s;
 }
 .modal-body .field-textarea {
-  min-height:180px; resize:vertical; font-family:var(--mono); font-size:13px; line-height:1.5;
+  min-height:180px; resize:vertical; font-family:var(--sans); font-size:14px; line-height:1.5;
 }
 .modal-body .field-input:focus, .modal-body .field-textarea:focus {
   border-color:rgba(59,130,246,.45);
@@ -718,28 +718,42 @@ function escapeHtml(s) {
 }
 
 function buildClientMessageDefaults(order, stepLabel, progress) {
-  const name = escapeHtml(order.partner_detail?.name||"");
-  const ref  = escapeHtml(order.name||"");
-  const step = escapeHtml(stepLabel||"");
-  const subject = `Votre commande NOTOX ${order.name||""} – Avancement ${progress}%`;
+  const name = order.partner_detail?.name || "";
+  const ref  = order.name || "";
+  const subject = `Votre commande NOTOX ${ref} – Avancement ${progress}%`;
   const body = progress===100
-    ? `<p>Bonjour ${name},</p>
-<p>Votre commande NOTOX <b>${ref}</b> est prête !<br>
-Nous vous contacterons pour organiser la livraison ou le retrait.</p>
-<p>Cordialement,<br>
-Équipe NOTOX / GREEN WAVE<br>
-www.notox.fr</p>`
-    : `<p>Bonjour ${name},</p>
-<p>État d'avancement de votre commande NOTOX <b>${ref}</b> :</p>
-<ul>
-  <li>Étape en cours : <b>${step}</b></li>
-  <li>Progression : <b>${progress}%</b></li>
-</ul>
-<p>Nous vous tiendrons informé(e) de la suite.</p>
-<p>Cordialement,<br>
-Équipe NOTOX / GREEN WAVE<br>
-www.notox.fr</p>`;
+    ? `Bonjour ${name},
+
+Votre commande NOTOX ${ref} est prête !
+Nous vous contacterons pour organiser la livraison ou le retrait.
+
+Cordialement,
+Équipe NOTOX / GREEN WAVE
+www.notox.fr`
+    : `Bonjour ${name},
+
+État d'avancement de votre commande NOTOX ${ref} :
+
+Étape en cours : ${stepLabel}
+Progression : ${progress}%
+
+Nous vous tiendrons informé(e) de la suite.
+
+Cordialement,
+Équipe NOTOX / GREEN WAVE
+www.notox.fr`;
   return { subject, body };
+}
+
+// Convertit un texte brut (ce que l'utilisateur voit/tape) en HTML valide
+// pour le chatter Odoo : échappe les entités, remplace \n par <br>, enveloppe
+// le tout dans <p>…</p>.
+function plainTextToHtml(text) {
+  const escaped = String(text||"")
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;");
+  return `<p>${escaped.replace(/\r?\n/g, "<br>")}</p>`;
 }
 
 // Redimensionne une image (côté long ≤ maxSide) et renvoie base64 + dataURL pour thumb.
@@ -800,7 +814,7 @@ function openClientMessageModal(order, stepLabel, stepId, progress) {
           <input id="msg-subject" class="field-input" type="text" value="${escapeHtml(subject)}">
         </div>
         <div>
-          <label class="field-label" for="msg-body">Message (HTML)</label>
+          <label class="field-label" for="msg-body">Message</label>
           <textarea id="msg-body" class="field-textarea" spellcheck="true">${escapeHtml(body)}</textarea>
         </div>
         <div>
@@ -881,7 +895,7 @@ function openClientMessageModal(order, stepLabel, stepId, progress) {
         headers: { "Content-Type": "application/json", "x-api-secret": CONFIG.apiSecret },
         body: JSON.stringify({
           subject: subjectVal,
-          body: bodyVal,
+          body: plainTextToHtml(bodyVal),
           partner_id: partnerId,
           attachments: photos.map(p => ({ name: p.name, data: p.data })),
         }),
