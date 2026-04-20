@@ -733,7 +733,12 @@ function buildClientMessageDefaults(order, stepLabel, stepId, progress) {
     ? `Commande NOTOX ${ref} – prête !`
     : `Commande NOTOX ${ref} – ${stepLabel} ok (${progress}%)`;
 
-  const template = (window.MESSAGES && (MESSAGES[stepId] || MESSAGES.default)) || null;
+  // Bug historique : `const MESSAGES` dans messages.js N'EST PAS attaché
+  // à window (seuls var/function le sont). Il faut donc tester via typeof
+  // sur l'identifiant global, pas via window.MESSAGES.
+  const hasMessages = typeof MESSAGES !== "undefined";
+  console.log("[msg] MESSAGES defined?", hasMessages, "stepId:", stepId, "keys:", hasMessages ? Object.keys(MESSAGES) : "—");
+  const template = hasMessages ? (MESSAGES[stepId] || MESSAGES.default) : null;
   const body = template ? template(firstName, ref, stepLabel, progress) : "";
   return { subject, body };
 }
