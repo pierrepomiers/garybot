@@ -321,11 +321,11 @@ header {
   border-color:rgba(59,130,246,.45);
 }
 .modal-info-banner {
-  background:rgba(59,130,246,.10); border:1px solid rgba(59,130,246,.35);
+  background:rgba(248,113,113,.15); border:1px solid rgba(248,113,113,.45);
   color:var(--text); border-radius:8px; padding:10px 12px;
   font-size:13px; line-height:1.5;
 }
-.modal-info-banner b { color:var(--accent); font-weight:700; }
+.modal-info-banner b { color:var(--red); font-weight:700; }
 .photo-picker {
   display:flex; flex-wrap:wrap; gap:8px;
 }
@@ -808,7 +808,7 @@ function openClientMessageModal(order, stepLabel, stepId, progress) {
 
   const lastSentIso = stepId ? S.meta[order.id]?.emails_sent?.[stepId] : null;
   const lastSentBanner = lastSentIso
-    ? `<div class="modal-info-banner">ℹ️ Un email <b>${escapeHtml(stepLabel)}</b> a déjà été envoyé le ${escapeHtml(fmtDateTime(lastSentIso))}. Vous pouvez quand même continuer.</div>`
+    ? `<div class="modal-info-banner">⚠️ Un email <b>${escapeHtml(stepLabel)}</b> a déjà été envoyé le ${escapeHtml(fmtDateTime(lastSentIso))}. Vous pouvez quand même continuer. ⚠️</div>`
     : "";
 
   const overlay = document.createElement("div");
