@@ -161,6 +161,16 @@ header {
 .priority-btn { font-size:12px; padding:5px 10px; border-radius:99px; border:1px solid rgba(255,255,255,.15); background:transparent; color:var(--muted); font-family:var(--mono); }
 .priority-btn.urgent { background:rgba(239,68,68,.18); color:var(--red); border-color:rgba(239,68,68,.35); }
 .priority-btn.normal { background:rgba(74,222,128,.12); color:var(--green); border-color:rgba(74,222,128,.28); }
+.contact-chip {
+  font-size:12px; padding:5px 10px; border-radius:99px;
+  background:rgba(255,255,255,.04); border:1px solid var(--border);
+  color:var(--text); font-family:var(--mono);
+  display:inline-flex; align-items:center; gap:5px;
+  text-decoration:none; max-width:220px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  transition:border-color .15s, background .15s, color .15s;
+}
+.contact-chip:hover { background:rgba(245,158,11,.12); border-color:rgba(245,158,11,.35); color:var(--accent); }
 
 /* ── STEP ROW ── */
 .step-row { display:flex; flex-direction:column; gap:5px; padding:10px 12px; border-radius:8px; background:rgba(255,255,255,.03); border:1px solid transparent; transition:all .2s; }
@@ -740,13 +750,22 @@ function renderCard(order) {
       </div>
     </div>` : "";
 
-  const metaRow = `
+  const phone = part.phone || "";
+  const email = part.email || "";
+  const contactRow = `
+    <div class="meta-row">
+      <button class="priority-btn ${isUrgent?"urgent":"normal"}" data-priority="${oid}">${isUrgent?"🔴 Urgent":"🟢 Normal"}</button>
+      ${phone ? `<a href="tel:${encodeURI(phone)}" class="contact-chip" title="Appeler">📞 ${phone}</a>` : ""}
+      ${phone ? `<a href="sms:${encodeURI(phone)}" class="contact-chip" title="Envoyer un SMS">💬 ${phone}</a>` : ""}
+      ${email ? `<a href="mailto:${email}" class="contact-chip" title="Envoyer un email">✉️ ${email}</a>` : ""}
+    </div>`;
+
+  const shaperRow = `
     <div class="meta-row">
       <span class="meta-label">Shaper</span>
       <input class="meta-input" id="shaper-${oid}" placeholder="prénom" value="${meta.shaper||""}" style="width:90px" data-meta-field="shaper" data-oid="${oid}">
       <span class="meta-label">Modèle</span>
       <input class="meta-input" id="model-${oid}" placeholder="Fish 5'10" value="${meta.model||""}" style="width:100px" data-meta-field="model" data-oid="${oid}">
-      <button class="priority-btn ${isUrgent?"urgent":"normal"}" data-priority="${oid}">${isUrgent?"🔴 Urgent":"🟢 Normal"}</button>
     </div>`;
 
   const stepsHtml = STEPS.map(step => {
@@ -836,11 +855,12 @@ function renderCard(order) {
     <div class="progress-bar-thin"><div class="progress-fill" style="width:${prog}%;background:${pColor(prog)}"></div></div>
     ${isExp?`
       ${archiveBanner}
-      ${metaRow}
+      ${contactRow}
       <div class="lines-summary">
         <div class="lines-title">CONTENU COMMANDE</div>
         ${linesHtml||'<div class="line-item">—</div>'}
       </div>
+      ${shaperRow}
       <div class="card-body">${stepsHtml}</div>
     `:""}
   </div>`;
