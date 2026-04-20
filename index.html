@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="messages.js?v=1776684017"></script>
+<script src="messages.js?v=1776690432"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -1041,9 +1041,10 @@ function renderCard(order) {
 
   const cardClass = isUrgent?"urgent":prog===100?"complete":prog>0?"in-progress":"";
 
-  const linesHtml = (order.lines_detail||[]).slice(0,6).map(l=>
-    `<div class="line-item"><strong>${l.product_id?.[1]||l.name||"—"}</strong> × ${l.product_uom_qty} — ${fmtAmount(l.price_subtotal)}</div>`
-  ).join("") + (order.lines_detail?.length>6?`<div class="line-item" style="color:var(--muted)">+${order.lines_detail.length-6} autres...</div>`:"");
+  const linesHtml = (order.lines_detail||[]).slice(0,6).map(l=>{
+    const label = l.product_id?.[1] || (l.name || "—").replace(/\n/g, "<br>");
+    return `<div class="line-item"><strong>${label}</strong> × ${l.product_uom_qty} — ${fmtAmount(l.price_subtotal)}</div>`;
+  }).join("") + (order.lines_detail?.length>6?`<div class="line-item" style="color:var(--muted)">+${order.lines_detail.length-6} autres...</div>`:"");
 
   const archiveBanner = isPending ? `
     <div class="archive-banner">
