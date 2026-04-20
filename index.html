@@ -808,7 +808,7 @@ function renderCard(order) {
     </div>`;
   }).join("");
 
-  const odooHref = order.name ? `${CONFIG.odooWebUrl}/odoo/sales/${encodeURIComponent(order.name)}` : null;
+  const odooHref = order.id ? `${CONFIG.odooWebUrl}/odoo/sales/${order.id}` : null;
   const extraMeta = (meta.due_date || meta.shaper);
 
   return `<div class="order-card ${cardClass}">
