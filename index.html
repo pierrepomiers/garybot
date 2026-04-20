@@ -372,7 +372,7 @@ async function loadStepsAndMeta() {
     S.steps[s.order_id][s.step_id] = { done:s.done, fournisseur:s.fournisseur, mail_sent:s.mail_sent, mail_relance:s.mail_relance };
   });
   S.meta = {};
-  metaData.forEach(m => { S.meta[m.order_id] = { delivery_type:m.delivery_type, priority:m.priority, shaper:m.shaper, model:m.model, dimensions:m.dimensions, due_date:m.due_date, archived:m.archived, archived_at:m.archived_at }; });
+  metaData.forEach(m => { S.meta[m.order_id] = { delivery_type:m.delivery_type, priority:m.priority, dimensions:m.dimensions, due_date:m.due_date, archived:m.archived, archived_at:m.archived_at }; });
 }
 
 async function syncOdoo() {
@@ -755,17 +755,9 @@ function renderCard(order) {
   const contactRow = `
     <div class="meta-row">
       <button class="priority-btn ${isUrgent?"urgent":"normal"}" data-priority="${oid}">${isUrgent?"🔴 Urgent":"🟢 Normal"}</button>
-      ${phone ? `<a href="tel:${encodeURI(phone)}" class="contact-chip" title="Appeler">📞 ${phone}</a>` : ""}
-      ${phone ? `<a href="sms:${encodeURI(phone)}" class="contact-chip" title="Envoyer un SMS">💬 ${phone}</a>` : ""}
-      ${email ? `<a href="mailto:${email}" class="contact-chip" title="Envoyer un email">✉️ ${email}</a>` : ""}
-    </div>`;
-
-  const shaperRow = `
-    <div class="meta-row">
-      <span class="meta-label">Shaper</span>
-      <input class="meta-input" id="shaper-${oid}" placeholder="prénom" value="${meta.shaper||""}" style="width:90px" data-meta-field="shaper" data-oid="${oid}">
-      <span class="meta-label">Modèle</span>
-      <input class="meta-input" id="model-${oid}" placeholder="Fish 5'10" value="${meta.model||""}" style="width:100px" data-meta-field="model" data-oid="${oid}">
+      ${phone ? `<a href="tel:${encodeURI(phone)}" class="contact-chip" title="Appeler ${phone}">📞 Tél.</a>` : ""}
+      ${phone ? `<a href="sms:${encodeURI(phone)}" class="contact-chip" title="SMS à ${phone}">💬 SMS</a>` : ""}
+      ${email ? `<a href="mailto:${email}" class="contact-chip" title="Email à ${email}">✉️ Mail</a>` : ""}
     </div>`;
 
   const stepsHtml = STEPS.map(step => {
@@ -828,7 +820,7 @@ function renderCard(order) {
   }).join("");
 
   const odooHref = order.id ? `${CONFIG.odooWebUrl}/odoo/sales/${order.id}` : null;
-  const extraMeta = (meta.due_date || meta.shaper);
+  const extraMeta = !!meta.due_date;
 
   return `<div class="order-card ${cardClass}">
     <div class="card-header" data-toggle="${oid}">
@@ -844,7 +836,6 @@ function renderCard(order) {
         <div class="card-client">${part.name||"—"}</div>
         ${extraMeta ? `<div class="card-meta">
           ${meta.due_date?`<span style="color:var(--accent)">📅 ${fmtDate(meta.due_date)}</span>`:""}
-          ${meta.shaper?`<span>✂ ${meta.shaper}</span>`:""}
         </div>` : ""}
       </div>
       <div class="card-right">
@@ -860,7 +851,6 @@ function renderCard(order) {
         <div class="lines-title">CONTENU COMMANDE</div>
         ${linesHtml||'<div class="line-item">—</div>'}
       </div>
-      ${shaperRow}
       <div class="card-body">${stepsHtml}</div>
     `:""}
   </div>`;
