@@ -192,6 +192,7 @@ header {
 .step-row:not(.done) .step-label { color:#cbd5e1; }
 
 .mail-btn { font-size:12px; padding:5px 10px; border-radius:99px; border:1px solid; font-family:var(--mono); text-decoration:none; display:inline-flex; align-items:center; gap:4px; flex-shrink:0; }
+.mail-btn.mail-client { font-size:16px; padding:9px 16px; gap:6px; min-height:40px; }
 .mail-client  { background:rgba(59,130,246,.12); color:#bfdbfe;    border-color:rgba(59,130,246,.3); }
 .mail-fourn   { background:rgba(245,158,11,.12); color:#fcd34d;    border-color:rgba(245,158,11,.3); }
 .mail-sent    { background:rgba(74,222,128,.12); color:var(--green); border-color:rgba(74,222,128,.3); }
@@ -289,11 +290,15 @@ header {
   padding:14px 16px; border-bottom:1px solid var(--border);
   background:linear-gradient(to bottom, rgba(59,130,246,.06), transparent);
 }
-.modal-title { font-family:var(--mono); font-size:14px; color:var(--accent); font-weight:700; letter-spacing:.04em; }
-.modal-title small { display:block; color:var(--muted); font-size:11px; font-weight:400; margin-top:2px; letter-spacing:.02em; }
+.modal-title { font-family:var(--mono); font-size:14px; color:var(--accent); font-weight:700; letter-spacing:.04em; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.modal-title .modal-title-icon { font-size:24px; line-height:1; flex-shrink:0; }
+.modal-title-text { display:flex; flex-direction:column; min-width:0; }
+.modal-title small { color:var(--muted); font-size:11px; font-weight:400; margin-top:2px; letter-spacing:.02em; }
 .modal-close {
-  background:none; border:none; color:var(--muted); font-size:22px; line-height:1;
-  padding:4px 8px; border-radius:6px; cursor:pointer;
+  background:none; border:none; color:var(--muted); font-size:32px; line-height:1;
+  padding:10px 14px; margin:-4px -8px -4px 0; border-radius:10px; cursor:pointer;
+  min-width:44px; min-height:44px;
+  display:inline-flex; align-items:center; justify-content:center;
 }
 .modal-close:hover { color:var(--text); background:rgba(255,255,255,.05); }
 .modal-body {
@@ -805,8 +810,11 @@ function openClientMessageModal(order, stepLabel, stepId, progress) {
     <div class="modal-card" role="dialog" aria-modal="true">
       <div class="modal-header">
         <div class="modal-title">
-          ✉ Message client
-          <small>${escapeHtml(order.name||"")} · ${escapeHtml(order.partner_detail?.name||"—")}${partnerEmail?` · ${escapeHtml(partnerEmail)}`:" · <span style='color:var(--red)'>pas d'email</span>"}</small>
+          <span class="modal-title-icon" aria-hidden="true">✉</span>
+          <span class="modal-title-text">
+            <span>Message client</span>
+            <small>${escapeHtml(order.name||"")} · ${escapeHtml(order.partner_detail?.name||"—")}${partnerEmail?` · ${escapeHtml(partnerEmail)}`:" · <span style='color:var(--red)'>pas d'email</span>"}</small>
+          </span>
         </div>
         <button class="modal-close" data-close aria-label="Fermer">×</button>
       </div>
