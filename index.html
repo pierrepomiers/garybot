@@ -93,6 +93,9 @@ header {
   gap:2px; background:var(--bg3); border:1px solid var(--border); border-radius:10px;
   padding:8px 4px; font-family:var(--mono); color:var(--text); min-width:0;
 }
+.stat-chip.stat-spacer {
+  background:transparent; border-color:transparent; pointer-events:none;
+}
 .stat-num { font-weight:700; font-size:20px; line-height:1.1; }
 .stat-label { font-size:10px; color:var(--muted); letter-spacing:.04em; text-transform:lowercase; white-space:nowrap; }
 
@@ -701,7 +704,7 @@ function renderOrders() {
 
   return `
   <div class="stats-bar">
-    <div class="stat-chip"><span class="stat-num" style="color:var(--accent)">${active.length}</span><span class="stat-label">actives</span></div>
+    <div class="stat-chip stat-spacer" aria-hidden="true"></div>
     <div class="stat-chip"><span class="stat-num" style="color:var(--orange)">${enCours}</span><span class="stat-label">en cours</span></div>
     <div class="stat-chip"><span class="stat-num" style="color:var(--green)">${terminees}</span><span class="stat-label">finies</span></div>
     <div class="stat-chip"><span class="stat-num" style="color:var(--muted)">${archived.length}</span><span class="stat-label">livrées</span></div>
