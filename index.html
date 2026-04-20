@@ -841,6 +841,8 @@ function openClientMessageModal(order, stepLabel, stepId, progress) {
 
   document.body.appendChild(overlay);
   document.body.style.overflow = "hidden";
+  document.body.style.position = "fixed";
+  document.body.style.width = "100%";
 
   const fileInput = overlay.querySelector("#msg-file");
   const thumbsEl  = overlay.querySelector("#msg-thumbs");
@@ -882,6 +884,8 @@ function openClientMessageModal(order, stepLabel, stepId, progress) {
 
   function close() {
     document.body.style.overflow = "";
+    document.body.style.position = "";
+    document.body.style.width = "";
     overlay.remove();
     document.removeEventListener("keydown", onKey);
   }
