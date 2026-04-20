@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="messages.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -726,31 +727,14 @@ function escapeHtml(s) {
 function buildClientMessageDefaults(order, stepLabel, stepId, progress) {
   const rawName   = (order.partner_detail?.name || "").trim();
   const firstName = rawName.split(/\s+/)[0] || "";
-  const greeting  = firstName ? `Bonjour ${firstName},` : "Bonjour,";
   const ref       = order.name || "";
-  const signoff   = `À bientôt,
-L'équipe NOTOX
-www.notox.fr`;
 
-  const isDelivery = stepId === "livraison";
-  const subject = isDelivery
+  const subject = stepId === "livraison"
     ? `Commande NOTOX ${ref} – prête !`
     : `Commande NOTOX ${ref} – ${stepLabel} ok (${progress}%)`;
-  const body = isDelivery
-    ? `${greeting}
 
-La planche est prête ! La commande NOTOX ${ref} est finalisée.
-
-On revient vers vous rapidement pour organiser la livraison ou le retrait.
-
-${signoff}`
-    : `${greeting}
-
-Bonne nouvelle ! La commande NOTOX ${ref} est en cours — étape ${stepLabel} terminée (${progress}%).
-
-On vous tient au courant de la suite !
-
-${signoff}`;
+  const template = (window.MESSAGES && (MESSAGES[stepId] || MESSAGES.default)) || null;
+  const body = template ? template(firstName, ref, stepLabel, progress) : "";
   return { subject, body };
 }
 
