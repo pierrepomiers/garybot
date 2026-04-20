@@ -5,21 +5,21 @@
 const MESSAGES = {
   default: (prenom, ref, stepLabel, progress) => `Bonjour ${prenom},
 
-Bonne nouvelle ! La commande NOTOX ${ref} est en cours — étape ${stepLabel} terminée (${progress}%).
+On a une bonne nouvelle !
+La commande NOTOX ${ref} avance bien : on a réalisé ${progress}% du travail. 
+En ce moment, on s'occupe de l'étape de ${stepLabel}.
 
-On vous tient au courant de la suite !
+On se tient au courant de la suite !
 
 À bientôt,
-L'équipe NOTOX
-www.notox.fr`,
+L'équipe NOTOX`,
 
   livraison: (prenom, ref) => `Bonjour ${prenom},
 
-La planche est prête ! La commande NOTOX ${ref} est finalisée.
+La planche est prête ! La commande NOTOX ${ref} est terminée.
 
-On revient vers vous rapidement pour organiser la livraison ou le retrait.
+On se reparle très rapidement pour organiser la livraison ou le retrait à l'atelier.
 
 À bientôt,
-L'équipe NOTOX
-www.notox.fr`,
+L'équipe NOTOX`,
 };
