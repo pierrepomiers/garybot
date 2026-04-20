@@ -723,31 +723,34 @@ function escapeHtml(s) {
   return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
 }
 
-function buildClientMessageDefaults(order, stepLabel, progress) {
-  const name = order.partner_detail?.name || "";
-  const ref  = order.name || "";
-  const subject = `Votre commande NOTOX ${ref} – Avancement ${progress}%`;
-  const body = progress===100
-    ? `Bonjour ${name},
-
-Votre commande NOTOX ${ref} est prête !
-Nous vous contacterons pour organiser la livraison ou le retrait.
-
-Cordialement,
-Équipe NOTOX / GREEN WAVE
-www.notox.fr`
-    : `Bonjour ${name},
-
-État d'avancement de votre commande NOTOX ${ref} :
-
-Étape en cours : ${stepLabel}
-Progression : ${progress}%
-
-Nous vous tiendrons informé(e) de la suite.
-
-Cordialement,
-Équipe NOTOX / GREEN WAVE
+function buildClientMessageDefaults(order, stepLabel, stepId, progress) {
+  const rawName   = (order.partner_detail?.name || "").trim();
+  const firstName = rawName.split(/\s+/)[0] || "";
+  const greeting  = firstName ? `Bonjour ${firstName},` : "Bonjour,";
+  const ref       = order.name || "";
+  const signoff   = `À bientôt,
+L'équipe NOTOX
 www.notox.fr`;
+
+  const isDelivery = stepId === "livraison";
+  const subject = isDelivery
+    ? `Commande NOTOX ${ref} – prête !`
+    : `Commande NOTOX ${ref} – ${stepLabel} ok (${progress}%)`;
+  const body = isDelivery
+    ? `${greeting}
+
+La planche est prête ! La commande NOTOX ${ref} est finalisée.
+
+On revient vers vous rapidement pour organiser la livraison ou le retrait.
+
+${signoff}`
+    : `${greeting}
+
+Bonne nouvelle ! La commande NOTOX ${ref} est en cours — étape ${stepLabel} terminée (${progress}%).
+
+On vous tient au courant de la suite !
+
+${signoff}`;
   return { subject, body };
 }
 
@@ -800,7 +803,7 @@ function openClientMessageModal(order, stepLabel, stepId, progress) {
   const partnerEmail = order.partner_detail?.email || "";
   if (!partnerId) { showToast("⚠ Client sans ID Odoo"); return; }
 
-  const { subject, body } = buildClientMessageDefaults(order, stepLabel, progress);
+  const { subject, body } = buildClientMessageDefaults(order, stepLabel, stepId, progress);
   const photos = []; // [{ name, data, dataUrl }]
 
   const overlay = document.createElement("div");
