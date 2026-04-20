@@ -174,7 +174,6 @@ header {
   transition:border-color .15s, background .15s, color .15s;
 }
 .contact-chip:hover { background:rgba(245,158,11,.12); border-color:rgba(245,158,11,.35); color:var(--accent); }
-.icon-contact { font-size:32px; line-height:1; }
 .contact-desktop { display:none; cursor:text; user-select:all; max-width:none; }
 .contact-desktop:hover { background:rgba(255,255,255,.04); border-color:var(--border); color:var(--text); }
 @media (min-width:768px) {
@@ -810,7 +809,7 @@ function openClientMessageModal(order, stepLabel, stepId, progress) {
     <div class="modal-card" role="dialog" aria-modal="true">
       <div class="modal-header">
         <div class="modal-title">
-          <span class="modal-title-icon" aria-hidden="true">✉</span>
+          <span class="modal-title-icon" aria-hidden="true">✉️</span>
           <span class="modal-title-text">
             <span>Message client</span>
             <small>${escapeHtml(order.name||"")} · ${escapeHtml(order.partner_detail?.name||"—")}${partnerEmail?` · ${escapeHtml(partnerEmail)}`:" · <span style='color:var(--red)'>pas d'email</span>"}</small>
@@ -1078,7 +1077,7 @@ function renderCard(order) {
       ${phone ? `<a href="tel:${encodeURI(phone)}" class="contact-chip contact-mobile" title="Appeler ${phone}">📞 Tél.</a>` : ""}
       ${phone ? `<a href="sms:${encodeURI(phone)}" class="contact-chip contact-mobile" title="SMS à ${phone}">💬 SMS</a>` : ""}
       ${phone ? `<span class="contact-chip contact-desktop" title="Numéro client">📞 ${phone}</span>` : ""}
-      ${email ? `<a href="mailto:${email}" class="contact-chip" title="Email à ${email}"><span class="icon-contact" aria-hidden="true">✉</span> Mail</a>` : ""}
+      ${email ? `<a href="mailto:${email}" class="contact-chip" title="Email à ${email}">✉️ Mail</a>` : ""}
     </div>`;
 
   const stepsHtml = STEPS.map(step => {
@@ -1110,7 +1109,7 @@ function renderCard(order) {
 
     let clientHtml = "";
     if (step.clientMail && isDone) {
-      clientHtml=`<button class="mail-btn mail-client" data-msg-oid="${oid}" data-msg-step="${step.id}" title="Écrire au client">✉ client</button>`;
+      clientHtml=`<button class="mail-btn mail-client" data-msg-oid="${oid}" data-msg-step="${step.id}" title="Écrire au client">✉️ client</button>`;
     }
 
     let livrHtml = "";
@@ -1124,7 +1123,7 @@ function renderCard(order) {
         </div>
         ${!isRetrait?`
           ${addr?`<div class="addr">📍 ${addr}</div>`:""}
-          ${part.email?`<div>✉ ${part.email}</div>`:""}
+          ${part.email?`<div>✉️ ${part.email}</div>`:""}
           ${(part.phone||part.mobile)?`<div>📞 ${part.phone||part.mobile}</div>`:""}
         `:`<div style="color:#a3e635">✓ Retrait sur place</div>`}
       </div>`;
