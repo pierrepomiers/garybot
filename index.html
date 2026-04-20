@@ -174,6 +174,7 @@ header {
   transition:border-color .15s, background .15s, color .15s;
 }
 .contact-chip:hover { background:rgba(245,158,11,.12); border-color:rgba(245,158,11,.35); color:var(--accent); }
+.contact-chip .chip-icon { font-size:32px; line-height:1; }
 .contact-desktop { display:none; cursor:text; user-select:all; max-width:none; }
 .contact-desktop:hover { background:rgba(255,255,255,.04); border-color:var(--border); color:var(--text); }
 @media (min-width:768px) {
@@ -192,7 +193,6 @@ header {
 .step-row:not(.done) .step-label { color:#cbd5e1; }
 
 .mail-btn { font-size:12px; padding:5px 10px; border-radius:99px; border:1px solid; font-family:var(--mono); text-decoration:none; display:inline-flex; align-items:center; gap:4px; flex-shrink:0; }
-.mail-btn.mail-client { font-size:16px; padding:9px 16px; gap:6px; min-height:40px; }
 .mail-client  { background:rgba(59,130,246,.12); color:#bfdbfe;    border-color:rgba(59,130,246,.3); }
 .mail-fourn   { background:rgba(245,158,11,.12); color:#fcd34d;    border-color:rgba(245,158,11,.3); }
 .mail-sent    { background:rgba(74,222,128,.12); color:var(--green); border-color:rgba(74,222,128,.3); }
@@ -291,7 +291,7 @@ header {
   background:linear-gradient(to bottom, rgba(59,130,246,.06), transparent);
 }
 .modal-title { font-family:var(--mono); font-size:14px; color:var(--accent); font-weight:700; letter-spacing:.04em; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
-.modal-title .modal-title-icon { font-size:24px; line-height:1; flex-shrink:0; }
+.modal-title .modal-title-icon { font-size:32px; line-height:1; flex-shrink:0; }
 .modal-title-text { display:flex; flex-direction:column; min-width:0; }
 .modal-title small { color:var(--muted); font-size:11px; font-weight:400; margin-top:2px; letter-spacing:.02em; }
 .modal-close {
@@ -1078,7 +1078,7 @@ function renderCard(order) {
       ${phone ? `<a href="tel:${encodeURI(phone)}" class="contact-chip contact-mobile" title="Appeler ${phone}">📞 Tél.</a>` : ""}
       ${phone ? `<a href="sms:${encodeURI(phone)}" class="contact-chip contact-mobile" title="SMS à ${phone}">💬 SMS</a>` : ""}
       ${phone ? `<span class="contact-chip contact-desktop" title="Numéro client">📞 ${phone}</span>` : ""}
-      ${email ? `<a href="mailto:${email}" class="contact-chip" title="Email à ${email}">✉️ Mail</a>` : ""}
+      ${email ? `<a href="mailto:${email}" class="contact-chip" title="Email à ${email}"><span class="chip-icon" aria-hidden="true">✉️</span> Mail</a>` : ""}
     </div>`;
 
   const stepsHtml = STEPS.map(step => {
