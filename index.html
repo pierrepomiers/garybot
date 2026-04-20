@@ -86,7 +86,7 @@ header {
 /* ── STATS ── */
 .stats-bar {
   display:grid; grid-template-columns:repeat(4, 1fr); gap:6px;
-  padding:10px 10px; border-bottom:1px solid var(--border); background:var(--bg2);
+  padding:10px 10px; border-bottom:1px solid var(--border); 
 }
 .stat-chip {
   display:flex; flex-direction:column; align-items:center; justify-content:center;
@@ -724,14 +724,25 @@ function renderOrders() {
       <option value="urgent"  ${S.filter==="urgent" ?"selected":""}>Urgentes</option>
     </select>
   </div>
-  <div class="orders-container">
-    ${S.loading
-      ? `<div class="loading"><div class="spinner"></div><br>Chargement...</div>`
-      : orders.length===0
-        ? `<div class="empty-state"><div class="empty-icon">🏄</div><div class="empty-text">Aucune commande</div></div>`
-        : orders.map(o=>renderCard(o)).join("")
-    }
+  <div class="orders-container" id="orders-container">
+    ${renderOrdersListInner(orders)}
   </div>`;
+}
+
+function renderOrdersListInner(orders) {
+  if (S.loading) return `<div class="loading"><div class="spinner"></div><br>Chargement...</div>`;
+  if (orders.length === 0) return `<div class="empty-state"><div class="empty-icon">🏄</div><div class="empty-text">Aucune commande</div></div>`;
+  return orders.map(o=>renderCard(o)).join("");
+}
+
+// Re-render partiel : met à jour uniquement la liste des commandes sans
+// recréer le header, la toolbar, ni l'input de recherche (évite la perte
+// de focus sur mobile à chaque frappe).
+function rerenderOrdersList() {
+  const container = document.getElementById("orders-container");
+  if (!container) return;
+  container.innerHTML = renderOrdersListInner(filteredOrders());
+  bindOrderCards();
 }
 
 function renderCard(order) {
@@ -953,9 +964,19 @@ function bindNav() {
 
 function bindOrders() {
   bindNav();
-  document.getElementById("search-input")?.addEventListener("input", e=>{ S.search=e.target.value; render(); });
+  document.getElementById("search-input")?.addEventListener("input", e=>{
+    S.search = e.target.value;
+    // Re-render partiel : on ne touche PAS à l'input (focus/curseur préservés).
+    rerenderOrdersList();
+  });
   document.getElementById("filter-select")?.addEventListener("change", e=>{ S.filter=e.target.value; render(); });
+  bindOrderCards();
+}
 
+// Bindings qui s'appliquent uniquement aux éléments à l'intérieur de
+// #orders-container — réutilisés par rerenderOrdersList() pour ne pas
+// dupliquer les listeners du header / de la toolbar.
+function bindOrderCards() {
   document.querySelectorAll("[data-toggle]").forEach(el=>el.addEventListener("click", (e)=>{
     if (e.target.closest("[data-stop-toggle]")) return;
     const oid=parseInt(el.dataset.toggle);
