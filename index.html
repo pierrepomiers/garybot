@@ -753,7 +753,7 @@ function buildClientMessageDefaults(order, stepLabel, stepId, progress) {
 
   const subject = stepId === "livraison"
     ? `Commande NOTOX ${ref} – prête !`
-    : `Commande NOTOX ${ref} – ${stepLabel} en cour !`;
+    : `Commande NOTOX ${ref} – ${stepLabel} en cours !`;
 
   // Bug historique : `const MESSAGES` dans messages.js N'EST PAS attaché
   // à window (seuls var/function le sont). Il faut donc tester via typeof
