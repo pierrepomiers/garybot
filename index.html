@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="messages.js?v=1776680820"></script>
+<script src="messages.js?v=1776684017"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -743,17 +743,6 @@ function buildClientMessageDefaults(order, stepLabel, stepId, progress) {
   return { subject, body };
 }
 
-// Convertit un texte brut (ce que l'utilisateur voit/tape) en HTML valide
-// pour le chatter Odoo : échappe les entités, remplace \n par <br>, enveloppe
-// le tout dans <p>…</p>.
-function plainTextToHtml(text) {
-  const escaped = String(text||"")
-    .replace(/&/g,"&amp;")
-    .replace(/</g,"&lt;")
-    .replace(/>/g,"&gt;");
-  return `<p>${escaped.replace(/\r?\n/g, "<br>")}</p>`;
-}
-
 // Redimensionne une image (côté long ≤ maxSide) et renvoie base64 + dataURL pour thumb.
 async function resizeImageToBase64(file, maxSide = 1280, quality = 0.85) {
   return new Promise((resolve, reject) => {
@@ -900,7 +889,7 @@ function openClientMessageModal(order, stepLabel, stepId, progress) {
         headers: { "Content-Type": "application/json", "x-api-secret": CONFIG.apiSecret },
         body: JSON.stringify({
           subject: subjectVal,
-          body: plainTextToHtml(bodyVal),
+          body: bodyVal,
           partner_id: partnerId,
           attachments: photos.map(p => ({ name: p.name, data: p.data })),
         }),
