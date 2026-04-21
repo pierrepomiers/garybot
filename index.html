@@ -1296,13 +1296,16 @@ function bindOrderCards() {
   document.querySelectorAll("[data-toggle]").forEach(el=>el.addEventListener("click", (e)=>{
     if (e.target.closest("[data-stop-toggle]")) return;
     const oid=parseInt(el.dataset.toggle);
-    if (S.expanded.has(oid)) {
-      S.expanded.clear();
-    } else {
-      S.expanded.clear();
-      S.expanded.add(oid);
-    }
+    const wasExpanded = S.expanded.has(oid);
+    S.expanded.clear();
+    if (!wasExpanded) S.expanded.add(oid);
     render();
+    if (!wasExpanded) {
+      setTimeout(()=>{
+        const card = document.querySelector(`[data-toggle="${oid}"]`)?.closest(".order-card");
+        card?.scrollIntoView({ behavior:"smooth", block:"start" });
+      }, 50);
+    }
   }));
   document.querySelectorAll(".step-check").forEach(btn=>btn.addEventListener("click", e=>{
     e.stopPropagation();
