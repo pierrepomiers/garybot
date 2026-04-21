@@ -1296,7 +1296,13 @@ function bindOrderCards() {
   document.querySelectorAll("[data-toggle]").forEach(el=>el.addEventListener("click", (e)=>{
     if (e.target.closest("[data-stop-toggle]")) return;
     const oid=parseInt(el.dataset.toggle);
-    S.expanded.has(oid)?S.expanded.delete(oid):S.expanded.add(oid); render();
+    if (S.expanded.has(oid)) {
+      S.expanded.clear();
+    } else {
+      S.expanded.clear();
+      S.expanded.add(oid);
+    }
+    render();
   }));
   document.querySelectorAll(".step-check").forEach(btn=>btn.addEventListener("click", e=>{
     e.stopPropagation();
