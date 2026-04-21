@@ -999,6 +999,25 @@ function escapeHtml(s) {
   return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
 }
 
+function fmtQty(n) {
+  const v = Number(n);
+  if (!isFinite(v)) return "0";
+  return String(v);
+}
+
+function bindQtyArrowKeys(inp) {
+  inp.addEventListener("keydown", e => {
+    if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+    e.preventDefault();
+    const cur = parseFloat(inp.value);
+    const base = isFinite(cur) ? cur : 0;
+    const next = e.key === "ArrowUp" ? base + 1 : Math.max(0, base - 1);
+    inp.value = fmtQty(next);
+    inp.dispatchEvent(new Event("input", { bubbles: true }));
+    inp.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+}
+
 function buildClientMessageDefaults(order, stepLabel, stepId, progress) {
   const rawName   = (order.partner_detail?.name || "").trim();
   const firstName = rawName.split(/\s+/)[0] || "";
@@ -1321,7 +1340,7 @@ function openSupplierCartModal(order, stepLabel, stepId, progress) {
       <div class="supplier-line-row" data-idx="${i}">
         <input type="checkbox" data-chk="${i}" ${l.checked?"checked":""}>
         <input class="sl-label" data-lbl="${i}" type="text" value="${escapeHtml(l.label||"")}">
-        <input class="sl-qty"   data-qty="${i}" type="number" min="0" step="0.01" value="${l.qty}">
+        <input class="sl-qty"   data-qty="${i}" type="number" min="0" step="any" value="${fmtQty(l.qty)}">
         ${l.source==="manual" ? `<button class="sl-del" data-del="${i}" type="button" aria-label="Supprimer">×</button>` : ""}
       </div>
     `).join("") || `<div style="color:var(--muted); font-size:13px; padding:8px 0;">Aucune ligne produit détectée. Ajoute une ligne manuelle.</div>`;
@@ -1332,9 +1351,12 @@ function openSupplierCartModal(order, stepLabel, stepId, progress) {
     linesEl.querySelectorAll("[data-lbl]").forEach(el => el.addEventListener("input", e => {
       lines[parseInt(el.dataset.lbl)].label = e.target.value;
     }));
-    linesEl.querySelectorAll("[data-qty]").forEach(el => el.addEventListener("input", e => {
-      const v = parseFloat(e.target.value); lines[parseInt(el.dataset.qty)].qty = isFinite(v) ? v : 0;
-    }));
+    linesEl.querySelectorAll("[data-qty]").forEach(el => {
+      el.addEventListener("input", e => {
+        const v = parseFloat(e.target.value); lines[parseInt(el.dataset.qty)].qty = isFinite(v) ? v : 0;
+      });
+      bindQtyArrowKeys(el);
+    });
     linesEl.querySelectorAll("[data-del]").forEach(el => el.addEventListener("click", () => {
       lines.splice(parseInt(el.dataset.del), 1); renderLines();
     }));
@@ -1569,7 +1591,7 @@ function renderSupplierCarts() {
       : items.map(it => `
           <div class="supplier-card-item" data-id="${it.id}">
             <input class="sci-label" data-id="${it.id}" type="text" value="${escapeHtml(it.product_label||"")}">
-            <input class="sci-qty"   data-id="${it.id}" data-field="qty" type="number" min="0" step="0.01" value="${Number(it.qty)||0}">
+            <input class="sci-qty"   data-id="${it.id}" data-field="qty" type="number" min="0" step="any" value="${fmtQty(it.qty)}">
             <span class="sci-ref">${it.order_ref ? escapeHtml(it.order_ref) : (it.source==="manual"?"manuel":"—")}</span>
             <button class="sci-del" data-del="${it.id}" type="button" title="Retirer">×</button>
           </div>
@@ -1611,13 +1633,16 @@ function bindSupplierCarts() {
     if (error) { console.warn(error); showToast("⚠ Maj label échouée"); return; }
     const row = S.supplierCartItems.find(r => r.id === id); if (row) row.product_label = val;
   }));
-  document.querySelectorAll(".sci-qty").forEach(inp => inp.addEventListener("blur", async e => {
-    const id = inp.dataset.id; const qty = parseFloat(e.target.value);
-    if (!isFinite(qty) || qty <= 0) { showToast("⚠ Quantité invalide"); return; }
-    const { error } = await sb.from("supplier_cart_items").update({ qty }).eq("id", id);
-    if (error) { console.warn(error); showToast("⚠ Maj qty échouée"); return; }
-    const row = S.supplierCartItems.find(r => r.id === id); if (row) row.qty = qty;
-  }));
+  document.querySelectorAll(".sci-qty").forEach(inp => {
+    inp.addEventListener("blur", async e => {
+      const id = inp.dataset.id; const qty = parseFloat(e.target.value);
+      if (!isFinite(qty) || qty <= 0) { showToast("⚠ Quantité invalide"); return; }
+      const { error } = await sb.from("supplier_cart_items").update({ qty }).eq("id", id);
+      if (error) { console.warn(error); showToast("⚠ Maj qty échouée"); return; }
+      const row = S.supplierCartItems.find(r => r.id === id); if (row) row.qty = qty;
+    });
+    bindQtyArrowKeys(inp);
+  });
   document.querySelectorAll("[data-del]").forEach(btn => btn.addEventListener("click", async () => {
     const id = btn.dataset.del;
     const { error } = await sb.from("supplier_cart_items").delete().eq("id", id);
