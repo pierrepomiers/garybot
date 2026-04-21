@@ -1303,7 +1303,11 @@ function bindOrderCards() {
     if (!wasExpanded) {
       setTimeout(()=>{
         const card = document.querySelector(`[data-toggle="${oid}"]`)?.closest(".order-card");
-        card?.scrollIntoView({ behavior:"smooth", block:"start" });
+        if (card) {
+          const rect = card.getBoundingClientRect();
+          const offsetTop = window.pageYOffset + rect.top - 128;
+          window.scrollTo({ top: offsetTop, behavior:"smooth" });
+        }
       }, 50);
     }
   }));
