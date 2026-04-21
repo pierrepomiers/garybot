@@ -195,14 +195,6 @@ header {
 
 .mail-btn { font-size:12px; padding:5px 10px; border-radius:99px; border:1px solid; font-family:var(--mono); text-decoration:none; display:inline-flex; align-items:center; gap:4px; flex-shrink:0; }
 .mail-client  { background:rgba(59,130,246,.12); color:#bfdbfe;    border-color:rgba(59,130,246,.3); }
-.mail-fourn   { background:rgba(245,158,11,.12); color:#fcd34d;    border-color:rgba(245,158,11,.3); }
-.mail-sent    { background:rgba(74,222,128,.12); color:var(--green); border-color:rgba(74,222,128,.3); }
-.mail-relance { background:rgba(239,68,68,.12);  color:var(--red); border-color:rgba(239,68,68,.3); }
-
-.step-fourn-row { padding-left:34px; display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
-.fourn-chip { font-size:12px; padding:4px 10px; border-radius:99px; border:1px solid rgba(255,255,255,.15); background:transparent; color:var(--muted); font-family:var(--mono); }
-.fourn-chip.selected { background:rgba(245,158,11,.18); color:#fcd34d; border-color:rgba(245,158,11,.45); }
-.no-email-warn { font-size:11px; color:var(--red); font-family:var(--mono); }
 
 .livraison-info { padding-left:34px; font-size:13px; color:var(--muted); display:flex; flex-direction:column; gap:4px; }
 .livraison-info .addr { color:var(--text); font-weight:500; }
@@ -390,6 +382,11 @@ header {
 }
 .mail-btn.mail-supplier:hover { background:rgba(168,85,247,.25); }
 .mail-btn.mail-supplier.has-sent { background:rgba(74,222,128,.14); color:#bbf7d0; border-color:rgba(74,222,128,.35); }
+.mail-btn.mail-reminder {
+  background:rgba(245,158,11,.12); color:#fcd34d; border-color:rgba(245,158,11,.3);
+  cursor:pointer;
+}
+.mail-btn.mail-reminder:hover { background:rgba(245,158,11,.22); }
 
 /* ── SETTINGS — bloc fournisseur étendu ── */
 .fourn-row.extended { align-items:stretch; }
@@ -479,21 +476,25 @@ header {
 /* ── SUPPLIER CART MODAL ── */
 .supplier-line-row {
   display:flex; align-items:center; gap:8px;
-  padding:6px 0; border-bottom:1px solid rgba(255,255,255,.04);
+  padding:6px 0;
 }
 .supplier-line-row input[type=checkbox] {
   width:18px; height:18px; accent-color:var(--accent); flex-shrink:0;
 }
 .supplier-line-row .sl-label {
   flex:1; min-width:0; background:var(--bg3); border:1px solid var(--border);
-  color:var(--text); padding:7px 9px; border-radius:6px; font-size:13px; outline:none;
+  color:var(--text); padding:10px 12px; border-radius:8px; font-size:14px; outline:none;
+  font-family:var(--sans); transition:border-color .15s;
 }
+.supplier-line-row .sl-label:focus { border-color:rgba(59,130,246,.45); }
 .supplier-line-row .sl-qty {
-  width:60px; background:var(--bg3); border:1px solid var(--border); color:var(--text);
-  padding:7px 8px; border-radius:6px; text-align:right; font-family:var(--mono); font-size:13px; outline:none;
+  width:72px; background:var(--bg3); border:1px solid var(--border); color:var(--text);
+  padding:10px 10px; border-radius:8px; text-align:right; font-family:var(--mono); font-size:14px; outline:none;
+  transition:border-color .15s;
 }
+.supplier-line-row .sl-qty:focus { border-color:rgba(59,130,246,.45); }
 .supplier-line-row .sl-del {
-  background:none; border:none; color:var(--muted); font-size:15px; padding:4px 8px;
+  background:none; border:none; color:var(--muted); font-size:18px; padding:4px 8px;
   border-radius:6px; cursor:pointer;
 }
 .supplier-line-row .sl-del:hover { color:var(--red); }
@@ -502,26 +503,40 @@ header {
   display:inline-flex; align-items:center; gap:6px;
   background:var(--bg3); border:1px solid var(--border); color:var(--text);
   padding:8px 12px; border-radius:99px; font-family:var(--mono); font-size:13px; cursor:pointer;
+  transition:background .15s, border-color .15s, color .15s;
 }
 .supplier-radio-row label.selected {
-  background:rgba(168,85,247,.2); color:#ede9fe; border-color:rgba(168,85,247,.45);
+  background:rgba(59,130,246,.2); color:#bfdbfe; border-color:rgba(59,130,246,.4);
 }
 .supplier-radio-row input { accent-color:var(--accent); }
 .btn-add-line {
   background:transparent; border:1px dashed var(--border); color:var(--muted);
-  padding:9px 12px; border-radius:8px; font-family:var(--mono); font-size:13px; width:100%;
+  padding:10px 12px; border-radius:8px; font-family:var(--mono); font-size:13px; width:100%;
+  transition:border-color .15s, color .15s;
 }
 .btn-add-line:hover { border-color:var(--accent); color:var(--accent); }
 .btn-modal-cart-add {
-  background:rgba(245,158,11,.16); color:#fcd34d; border-color:rgba(245,158,11,.35);
+  background:transparent; color:#bfdbfe; border-color:rgba(59,130,246,.3);
 }
-.btn-modal-cart-add:hover:not(:disabled) { background:rgba(245,158,11,.26); }
+.btn-modal-cart-add:hover:not(:disabled) {
+  background:rgba(59,130,246,.1); color:#dbeafe; border-color:rgba(59,130,246,.5);
+}
 
 /* Preview modal */
 .preview-box {
   max-height:280px; overflow:auto; border:1px solid var(--border);
   border-radius:8px; padding:12px; background:#fff; color:#222;
 }
+.reminder-preview-table {
+  width:100%; border-collapse:collapse; font-family:var(--mono); font-size:12px;
+  background:var(--bg3); border-radius:8px; overflow:hidden;
+}
+.reminder-preview-table th, .reminder-preview-table td {
+  padding:6px 10px; border-bottom:1px solid var(--border); text-align:left; color:var(--text);
+}
+.reminder-preview-table th { color:var(--muted); font-weight:700; text-transform:uppercase; font-size:11px; letter-spacing:.05em; background:rgba(255,255,255,.02); }
+.reminder-preview-table tr:last-child td { border-bottom:none; }
+.reminder-preview-table td:nth-child(2), .reminder-preview-table th:nth-child(2) { text-align:right; width:72px; }
 
 /* ── LOADING ── */
 .loading { text-align:center; padding:48px 16px; color:var(--muted); font-family:var(--mono); font-size:14px; }
@@ -585,6 +600,9 @@ let S = {
   suppliersByKey: {},        // { 'viral': { key, name, email, cc, template_*, mail_mode, ... } }
   supplierCartItems: [],     // items en attente (sent_at NULL) de tous les fournisseurs
   supplierSentIndex: new Set(), // "oid|stepId" pour lesquels au moins un envoi a déjà été fait
+  // Historique d'envois par (order, step) → Map<supplier_key, { logs, count_total, count_reminders, last_sent_at, first_batch_id, last_subject }>
+  // Alimenté depuis supplier_messages_log (seulement les lignes avec order_id + step_id renseignés).
+  sendHistoryIndex: new Map(),
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -632,7 +650,7 @@ async function checkSession() {
 // ══════════════════════════════════════════════════════════════════════════════
 async function loadAll() {
   S.loading = true; render();
-  await Promise.all([loadFournisseurs(), loadStepsAndMeta(), syncOdoo(), loadSupplierCart()]);
+  await Promise.all([loadFournisseurs(), loadStepsAndMeta(), syncOdoo(), loadSupplierCart(), loadSupplierSendHistory()]);
   S.loading = false; render();
 }
 
@@ -678,6 +696,63 @@ async function loadSupplierCart() {
       S.supplierSentIndex.add(`${it.order_id}|${it.step_id}`);
     }
   });
+}
+
+// Charge l'historique d'envois (supplier_messages_log) et construit l'index
+// sendHistoryIndex : Map "oid|stepId" → Map<supplier_key, stats>.
+// On ne considère que les lignes qui ont order_id + step_id renseignés ;
+// les envois anciens sans ces colonnes restent invisibles côté relance (OK,
+// la relance se teste sur les prochains envois).
+async function loadSupplierSendHistory() {
+  const { data, error } = await sb
+    .from("supplier_messages_log")
+    .select("batch_id, supplier_key, subject, is_reminder, parent_batch_id, order_id, step_id, sent_at, item_count")
+    .not("order_id", "is", null)
+    .not("step_id", "is", null)
+    .order("sent_at", { ascending: true });
+  if (error) { console.warn("loadSupplierSendHistory:", error); S.sendHistoryIndex = new Map(); return; }
+
+  const idx = new Map();
+  for (const r of data || []) {
+    const k = `${r.order_id}|${r.step_id}`;
+    if (!idx.has(k)) idx.set(k, new Map());
+    const bySupplier = idx.get(k);
+    if (!bySupplier.has(r.supplier_key)) {
+      bySupplier.set(r.supplier_key, {
+        logs: [],
+        count_total: 0,
+        count_reminders: 0,
+        first_batch_id: null,
+        last_batch_id: null,
+        last_sent_at: null,
+        last_subject: null,
+      });
+    }
+    const s = bySupplier.get(r.supplier_key);
+    s.logs.push(r);
+    s.count_total += 1;
+    if (r.is_reminder) s.count_reminders += 1;
+    else if (!s.first_batch_id) s.first_batch_id = r.batch_id;
+    s.last_batch_id = r.batch_id;
+    s.last_sent_at = r.sent_at;
+    s.last_subject = r.subject;
+  }
+  S.sendHistoryIndex = idx;
+}
+
+// Retourne la liste des fournisseurs ayant au moins 1 envoi pour (order_id, step_id).
+// Chaque entrée : { key, name, stats } où stats = { count_total, count_reminders, last_sent_at, first_batch_id, last_subject }.
+function getSupplierSendsForStep(orderId, stepId) {
+  const bySupplier = S.sendHistoryIndex.get(`${orderId}|${stepId}`);
+  if (!bySupplier) return [];
+  const out = [];
+  for (const [key, stats] of bySupplier.entries()) {
+    const sup = S.suppliersByKey[key];
+    if (!sup) continue;
+    out.push({ key, name: sup.name, stats });
+  }
+  out.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  return out;
 }
 
 function pendingItemsForSupplier(key) {
@@ -830,20 +905,6 @@ async function toggleStep(orderId, stepId, currentDone) {
   }
 }
 
-async function setFournisseur(orderId, stepId, fourn) {
-  if (!S.steps[orderId]) S.steps[orderId] = {};
-  S.steps[orderId][stepId] = { ...(S.steps[orderId][stepId]||{}), fournisseur:fourn };
-  render();
-  const order = S.orders.find(o => o.id === orderId);
-  await sb.from("order_steps").upsert({
-    order_id:orderId, order_name:order?.name||"", step_id:stepId,
-    done:S.steps[orderId][stepId]?.done||false, fournisseur:fourn,
-    mail_sent:S.steps[orderId][stepId]?.mail_sent||false,
-    mail_relance:S.steps[orderId][stepId]?.mail_relance||false,
-    updated_by:S.user.id,
-  }, { onConflict:"order_id,step_id" });
-}
-
 async function markMailSent(orderId, stepId, isRelance) {
   if (!S.steps[orderId]) S.steps[orderId] = {};
   const cur = S.steps[orderId][stepId] || {};
@@ -923,6 +984,7 @@ function getProgress(orderId) {
 function pClass(p) { return p===100?"p100":p>=61?"p75":p>=31?"p50":"p25"; }
 function pColor(p) { return p===100?"#4ade80":p>=61?"#fbbf24":p>=31?"#fb923c":"#f87171"; }
 function fmtDate(s) { return s ? new Date(s).toLocaleDateString("fr-FR",{day:"2-digit",month:"2-digit",year:"2-digit"}) : ""; }
+function fmtShortDate(s) { return s ? new Date(s).toLocaleDateString("fr-FR",{day:"2-digit",month:"2-digit"}) : ""; }
 function fmtDateTime(s) {
   if (!s) return "";
   const d = new Date(s);
@@ -932,16 +994,6 @@ function fmtDateTime(s) {
 }
 function fmtAmount(n) { return n ? new Intl.NumberFormat("fr-FR",{style:"currency",currency:"EUR",maximumFractionDigits:0}).format(n) : ""; }
 function buildAddr(p) { if(!p) return ""; return [p.street,p.zip,p.city,p.country_id?.[1]].filter(Boolean).join(", "); }
-
-function buildMailtoFourn(email, fourn, order, stepLabel, isRelance) {
-  const ref = order.name||""; const client = order.partner_detail?.name||"";
-  const lines = (order.lines_detail||[]).map(l=>`  - ${l.product_id?.[1]||l.name} x${l.product_uom_qty}`).join("\n");
-  const subj = isRelance ? `RELANCE – Commande NOTOX ${ref} / ${stepLabel}` : `Commande NOTOX ${ref} – ${stepLabel}`;
-  const body = isRelance
-    ? `Bonjour ${fourn},\n\nNous revenons vers vous concernant notre commande NOTOX ${ref} (${stepLabel}) pour le client ${client}.\n\nMerci de nous confirmer la disponibilité et le délai.\n\nCordialement,\nÉquipe NOTOX / GREEN WAVE`
-    : `Bonjour ${fourn},\n\nVeuillez trouver ci-dessous notre commande ${ref} pour le client ${client}.\n\nDétail :\n${lines||"  (voir commande jointe)"}\n\nMerci de confirmer réception et délai.\n\nCordialement,\nÉquipe NOTOX / GREEN WAVE\nwww.notox.fr`;
-  return `mailto:${email}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
-}
 
 function escapeHtml(s) {
   return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
@@ -1367,7 +1419,7 @@ function openSupplierCartModal(order, stepLabel, stepId, progress) {
         qty: Number(r.qty) || 1,
         order_ref: r.order_ref || null,
       }));
-      const result = await sendSupplierBatch(supplier, itemsToSend);
+      const result = await sendSupplierBatch(supplier, itemsToSend, { orderId: order.id, stepId });
       close();
       if (!result.warning) {
         showToast(`✓ Envoyé à ${supplier.name} — ${itemsToSend.length} article${itemsToSend.length>1?"s":""}`);
@@ -1382,21 +1434,40 @@ function openSupplierCartModal(order, stepLabel, stepId, progress) {
 }
 
 // Envoie un batch au backend /supplier-cart/send puis met à jour Supabase.
-// itemsToSend : [{ id, product_label, qty, order_ref }]  — IDs doivent être valides dans supplier_cart_items.
+// itemsToSend : [{ id, product_label, qty, order_ref }] — pour un envoi initial, les IDs
+//   doivent être valides dans supplier_cart_items ; pour une relance, les IDs sont juste
+//   passés au backend (pas d'update cart_items).
+// opts : {
+//   orderId, stepId        — si fournis, écrits dans supplier_messages_log (utile à la relance)
+//   isReminder             — true → skip update cart_items, insert log avec is_reminder=true
+//   parentBatchId          — id du batch d'origine (requis si isReminder=true)
+//   subjectOverride        — sujet à envoyer au backend (relance : "RELANCE — …")
+//   headerOverride         — en-tête à envoyer au backend
+// }
 //
 // Atomicité :
 //  - Backend KO → throw (caller affiche "Envoi échoué"). Aucune écriture Supabase.
 //  - Backend OK mais update cart_items KO → mail parti, showToast WARNING explicite, return {warning}.
 //  - Backend OK + update OK mais insert log KO → mail parti + items marqués sent,
 //    showToast WARNING moins grave, return {warning}.
-// Dans tous les cas post-envoi, loadSupplierCart() est rejoué (try/finally) pour refresh l'UI.
-async function sendSupplierBatch(supplier, itemsToSend) {
+// Dans tous les cas post-envoi, loadSupplierCart() + loadSupplierSendHistory() sont rejoués (try/finally).
+async function sendSupplierBatch(supplier, itemsToSend, opts = {}) {
   if (!supplier?.email) throw new Error("Email fournisseur manquant");
   if (!itemsToSend || itemsToSend.length === 0) throw new Error("Aucun article à envoyer");
 
+  const {
+    orderId = null, stepId = null,
+    isReminder = false, parentBatchId = null,
+    subjectOverride = null, headerOverride = null,
+  } = opts;
+
   const ctx = { date: window.SUPPLIER_TEMPLATES.formatDate(), supplier_name: supplier.name };
-  const subject = window.SUPPLIER_TEMPLATES.applyPlaceholders(supplier.template_subject || window.SUPPLIER_TEMPLATES.defaultSubject, ctx);
-  const header  = window.SUPPLIER_TEMPLATES.applyPlaceholders(supplier.template_header  || window.SUPPLIER_TEMPLATES.defaultHeader,  ctx);
+  const subject = subjectOverride != null
+    ? subjectOverride
+    : window.SUPPLIER_TEMPLATES.applyPlaceholders(supplier.template_subject || window.SUPPLIER_TEMPLATES.defaultSubject, ctx);
+  const header  = headerOverride  != null
+    ? headerOverride
+    : window.SUPPLIER_TEMPLATES.applyPlaceholders(supplier.template_header  || window.SUPPLIER_TEMPLATES.defaultHeader,  ctx);
   const footer  = window.SUPPLIER_TEMPLATES.applyPlaceholders(supplier.template_footer  || window.SUPPLIER_TEMPLATES.defaultFooter,  ctx);
 
   const payload = {
@@ -1426,32 +1497,48 @@ async function sendSupplierBatch(supplier, itemsToSend) {
   // ── À partir d'ici le mail est PARTI. Les erreurs Supabase sont des warnings, pas des throws.
   let warning = null;
   try {
-    const ids = itemsToSend.map(it => it.id);
-    const { error: upErr } = await sb
-      .from("supplier_cart_items")
-      .update({ sent_at: sentAt, batch_id: batchId })
-      .in("id", ids);
-    if (upErr) {
-      console.error("update supplier_cart_items failed:", upErr);
-      warning = `⚠️ Mail envoyé à ${supplier.name} (batch=${batchId}) mais sauvegarde panier échouée. Vérifie la vue Paniers et purge les éventuels doublons.`;
-    } else {
-      const { error: logErr } = await sb.from("supplier_messages_log").insert({
-        batch_id: batchId,
-        supplier_key: supplier.key,
-        supplier_email: supplier.email,
-        subject: out.subject || subject,
-        body_html: out.body_html || null,
-        item_count: out.item_count || ids.length,
-        sent_by: S.user?.email || null,
-      });
+    const logRow = {
+      batch_id: batchId,
+      supplier_key: supplier.key,
+      supplier_email: supplier.email,
+      subject: out.subject || subject,
+      body_html: out.body_html || null,
+      item_count: out.item_count || itemsToSend.length,
+      sent_by: S.user?.email || null,
+      order_id: orderId,
+      step_id: stepId,
+      is_reminder: !!isReminder,
+      parent_batch_id: isReminder ? parentBatchId : null,
+    };
+
+    if (isReminder) {
+      // Relance : on NE touche PAS à supplier_cart_items. Insert log seul.
+      const { error: logErr } = await sb.from("supplier_messages_log").insert(logRow);
       if (logErr) {
-        console.error("insert supplier_messages_log failed:", logErr);
-        warning = `⚠️ Mail envoyé (batch=${batchId}) mais historique non enregistré. Les items sont bien marqués sent.`;
+        console.error("insert supplier_messages_log (reminder) failed:", logErr);
+        warning = `⚠️ Relance envoyée à ${supplier.name} (batch=${batchId}) mais historique non enregistré.`;
+      }
+    } else {
+      // Envoi initial : update cart_items puis insert log.
+      const ids = itemsToSend.map(it => it.id);
+      const { error: upErr } = await sb
+        .from("supplier_cart_items")
+        .update({ sent_at: sentAt, batch_id: batchId })
+        .in("id", ids);
+      if (upErr) {
+        console.error("update supplier_cart_items failed:", upErr);
+        warning = `⚠️ Mail envoyé à ${supplier.name} (batch=${batchId}) mais sauvegarde panier échouée. Vérifie la vue Paniers et purge les éventuels doublons.`;
+      } else {
+        const { error: logErr } = await sb.from("supplier_messages_log").insert(logRow);
+        if (logErr) {
+          console.error("insert supplier_messages_log failed:", logErr);
+          warning = `⚠️ Mail envoyé (batch=${batchId}) mais historique non enregistré. Les items sont bien marqués sent.`;
+        }
       }
     }
   } finally {
-    try { await loadSupplierCart(); }
-    catch (e) { console.warn("loadSupplierCart refresh failed:", e); }
+    try { await Promise.all([loadSupplierCart(), loadSupplierSendHistory()]); }
+    catch (e) { console.warn("supplier refresh failed:", e); }
   }
 
   if (warning) showToast(warning);
@@ -1601,7 +1688,7 @@ function openSupplierSendPreview(supplier, items) {
       <div class="modal-body">
         <div>
           <label class="field-label">Sujet</label>
-          <div style="font-family:var(--mono);font-size:13px;color:var(--text); padding:8px 10px; background:var(--bg3); border-radius:8px; border:1px solid var(--border);">${escapeHtml(subject)}</div>
+          <input class="field-input" type="text" value="${escapeHtml(subject)}" readonly>
         </div>
         <div>
           <label class="field-label">Aperçu du mail</label>
@@ -1635,7 +1722,14 @@ function openSupplierSendPreview(supplier, items) {
       const toSend = items.map(it => ({
         id: it.id, product_label: it.product_label, qty: Number(it.qty)||1, order_ref: it.order_ref || null,
       }));
-      const result = await sendSupplierBatch(supplier, toSend);
+      // Si tous les items partagent la même (order_id, step_id), on les passe
+      // à sendSupplierBatch pour que la relance future soit possible. Sinon (envoi
+      // multi-commandes depuis la vue Paniers), on les laisse null.
+      const oids = new Set(items.map(it => it.order_id));
+      const sids = new Set(items.map(it => it.step_id));
+      const unifiedOrderId = oids.size === 1 ? [...oids][0] : null;
+      const unifiedStepId  = sids.size === 1 ? [...sids][0] : null;
+      const result = await sendSupplierBatch(supplier, toSend, { orderId: unifiedOrderId, stepId: unifiedStepId });
       close();
       if (!result.warning) {
         showToast(`✓ Envoyé à ${supplier.name} — ${toSend.length} article${toSend.length>1?"s":""}`);
@@ -1647,6 +1741,150 @@ function openSupplierSendPreview(supplier, items) {
       showToast("⚠ Échec envoi mail : " + (err.message || err));
     }
   });
+}
+
+// ── Modal de relance fournisseur ───────────────────────────────────────────
+// Ouvre une modal pour relancer un fournisseur sur une étape donnée.
+// Pré-remplit sujet/en-tête, relit les items du batch d'origine depuis
+// supplier_cart_items, puis POST /supplier-cart/send avec is_reminder=true
+// et parent_batch_id = batch_id du premier envoi.
+async function openReminderModal(order, stepId, supplierKey) {
+  const supplier = S.suppliersByKey[supplierKey];
+  if (!supplier) { showToast("⚠ Fournisseur inconnu"); return; }
+  if (!supplier.email) { showToast("⚠ Email fournisseur manquant — renseigne-le dans Réglages"); return; }
+
+  const bySupplier = S.sendHistoryIndex.get(`${order.id}|${stepId}`);
+  const stats = bySupplier ? bySupplier.get(supplierKey) : null;
+  if (!stats || !stats.first_batch_id) {
+    showToast("⚠ Aucun envoi initial à relancer");
+    return;
+  }
+
+  const firstSentAt = stats.logs.find(l => !l.is_reminder)?.sent_at || stats.logs[0]?.sent_at;
+
+  // Relire les items de l'envoi d'origine
+  const { data: originItems, error: itemsErr } = await sb
+    .from("supplier_cart_items")
+    .select("id, product_label, qty, order_ref, source")
+    .eq("batch_id", stats.first_batch_id)
+    .order("added_at", { ascending: true });
+  if (itemsErr) {
+    console.error("load origin items:", itemsErr);
+    showToast("⚠ Lecture des articles d'origine échouée");
+    return;
+  }
+  if (!originItems || originItems.length === 0) {
+    showToast("⚠ Aucun article trouvé pour le batch d'origine");
+    return;
+  }
+
+  const firstSentFmt = fmtDate(firstSentAt);
+  const defaultSubject = `RELANCE — ${stats.last_subject || "Commande NOTOX"}`;
+  const defaultHeader  = `Bonjour, suite à notre commande du ${firstSentFmt}, je me permets de vous relancer. Merci de me confirmer la bonne réception et les délais de livraison. Voici le détail pour rappel :`;
+
+  const rowsHtml = originItems.map(it => {
+    const qtyS = (Number(it.qty)||0).toString().replace(/\.0+$/, "");
+    return `<tr>
+      <td>${escapeHtml(it.product_label||"")}</td>
+      <td>${qtyS}</td>
+      <td>${escapeHtml(it.order_ref||"")}</td>
+    </tr>`;
+  }).join("");
+
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal-card" role="dialog" aria-modal="true">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span class="modal-title-icon" aria-hidden="true">🔄</span>
+          <span class="modal-title-text">
+            <span>Relance fournisseur</span>
+            <small>${escapeHtml(supplier.name)} · ${escapeHtml(supplier.email)}</small>
+          </span>
+        </div>
+        <button class="modal-close" data-close aria-label="Fermer">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-info-banner">
+          ${stats.count_total} envoi${stats.count_total>1?"s":""} déjà effectué${stats.count_total>1?"s":""} (dont ${stats.count_reminders} relance${stats.count_reminders>1?"s":""}). Dernier : ${escapeHtml(fmtDateTime(stats.last_sent_at))}.
+        </div>
+        <div>
+          <label class="field-label" for="rm-subject">Sujet</label>
+          <input id="rm-subject" class="field-input" type="text" value="${escapeHtml(defaultSubject)}">
+        </div>
+        <div>
+          <label class="field-label" for="rm-header">En-tête</label>
+          <textarea id="rm-header" class="field-textarea" spellcheck="true">${escapeHtml(defaultHeader)}</textarea>
+        </div>
+        <div>
+          <label class="field-label">Articles du batch d'origine</label>
+          <table class="reminder-preview-table">
+            <thead><tr><th>Article</th><th>Qté</th><th>Réf</th></tr></thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-modal-cancel" data-close>Annuler</button>
+        <button class="btn-modal-send" id="rm-confirm">🔄 Confirmer la relance</button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(overlay);
+  document.body.style.overflow = "hidden";
+  document.body.style.position = "fixed";
+  document.body.style.width = "100%";
+
+  const subjectEl = overlay.querySelector("#rm-subject");
+  const headerEl  = overlay.querySelector("#rm-header");
+  const btnConfirm = overlay.querySelector("#rm-confirm");
+
+  function close() {
+    document.body.style.overflow = ""; document.body.style.position = ""; document.body.style.width = "";
+    overlay.remove();
+    document.removeEventListener("keydown", onKey);
+  }
+  function onKey(e) { if (e.key === "Escape") close(); }
+  document.addEventListener("keydown", onKey);
+  overlay.querySelectorAll("[data-close]").forEach(b => b.addEventListener("click", close));
+  overlay.addEventListener("click", e => { if (e.target === overlay) close(); });
+
+  btnConfirm.addEventListener("click", async () => {
+    const subjectVal = subjectEl.value.trim();
+    const headerVal  = headerEl.value.trim();
+    if (!subjectVal) { showToast("⚠ Sujet vide"); return; }
+    if (!headerVal)  { showToast("⚠ En-tête vide"); return; }
+
+    btnConfirm.disabled = true; btnConfirm.innerHTML = `<span class="spinner-xs"></span> Envoi…`;
+    try {
+      const toSend = originItems.map(it => ({
+        id: it.id,
+        product_label: it.product_label,
+        qty: Number(it.qty) || 1,
+        order_ref: it.order_ref || null,
+      }));
+      const result = await sendSupplierBatch(supplier, toSend, {
+        orderId: order.id,
+        stepId,
+        isReminder: true,
+        parentBatchId: stats.first_batch_id,
+        subjectOverride: subjectVal,
+        headerOverride: headerVal,
+      });
+      close();
+      if (!result.warning) {
+        showToast(`✓ Relance envoyée à ${supplier.name}`);
+      }
+      render();
+    } catch (err) {
+      console.error(err);
+      btnConfirm.disabled = false; btnConfirm.innerHTML = "🔄 Confirmer la relance";
+      showToast("⚠ Échec envoi relance : " + (err.message || err));
+    }
+  });
+
+  setTimeout(() => subjectEl?.focus(), 50);
 }
 
 function showToast(msg) {
@@ -1810,29 +2048,6 @@ function renderCard(order) {
   const stepsHtml = STEPS.map(step => {
     const check  = (S.steps[oid]||{})[step.id]||{};
     const isDone = !!check.done;
-    const selF   = check.fournisseur||"";
-    const foEmail= selF?(S.fournisseurs[selF]?.email||""):"";
-    const mSent  = !!check.mail_sent;
-
-    let foHtml = "";
-    if (step.fourn) {
-      const chips = step.fourn.map(f=>
-        `<button class="fourn-chip${selF===f?" selected":""}" data-oid="${oid}" data-step="${step.id}" data-fourn="${f}">${f}</button>`
-      ).join("");
-      let mailHtml = "";
-      if (selF && foEmail) {
-        const href = buildMailtoFourn(foEmail, selF, order, step.label, false);
-        if (!mSent) {
-          mailHtml=`<a href="${href}" class="mail-btn mail-fourn" data-oid="${oid}" data-step="${step.id}" data-relance="false" onclick="window._mailSent(${oid},'${step.id}',false)">📨 Envoyer</a>`;
-        } else {
-          const hrefR = buildMailtoFourn(foEmail, selF, order, step.label, true);
-          mailHtml=`<span class="mail-btn mail-sent">✓ Envoyé</span><a href="${hrefR}" class="mail-btn mail-relance" onclick="window._mailSent(${oid},'${step.id}',true)">🔁 Relancer</a>`;
-        }
-      } else if (selF && !foEmail) {
-        mailHtml=`<span class="no-email-warn">⚠ email manquant</span>`;
-      }
-      foHtml=`<div class="step-fourn-row">${chips}${mailHtml}</div>`;
-    }
 
     let clientHtml = "";
     if (step.clientMail && isDone) {
@@ -1840,9 +2055,19 @@ function renderCard(order) {
     }
 
     let supplierBtnHtml = "";
+    let reminderBtnsHtml = "";
     if (step.fourn && isDone) {
       const hasSent = S.supplierSentIndex.has(`${oid}|${step.id}`);
       supplierBtnHtml=`<button class="mail-btn mail-supplier${hasSent?" has-sent":""}" data-supplier-oid="${oid}" data-supplier-step="${step.id}" title="Préparer commande fournisseur">📦 ${hasSent?"✓ ":""}fournisseur</button>`;
+
+      const sends = getSupplierSendsForStep(oid, step.id);
+      reminderBtnsHtml = sends
+        .filter(s => s.stats.first_batch_id) // besoin du batch d'origine pour relancer
+        .map(s => {
+          const countLabel = s.stats.count_reminders > 0 ? `🔄 ${s.stats.count_reminders}` : `🔄`;
+          const lastShort  = fmtShortDate(s.stats.last_sent_at);
+          return `<button class="mail-btn mail-reminder" data-reminder-oid="${oid}" data-reminder-step="${step.id}" data-reminder-supplier="${escapeHtml(s.key)}" title="Relancer ${escapeHtml(s.name)}">${countLabel} ${escapeHtml(s.name)} · ${lastShort}</button>`;
+        }).join("");
     }
 
     let livrHtml = "";
@@ -1866,9 +2091,9 @@ function renderCard(order) {
       <div class="step-row-top">
         <button class="step-check" data-oid="${oid}" data-step="${step.id}">${isDone?"✅":"☑️"}</button>
         <span class="step-label">${step.label}</span>
-        ${supplierBtnHtml}${clientHtml}
+        ${supplierBtnHtml}${reminderBtnsHtml}${clientHtml}
       </div>
-      ${foHtml}${livrHtml}
+      ${livrHtml}
     </div>`;
   }).join("");
 
@@ -2039,7 +2264,6 @@ function renderSettings() {
 // ══════════════════════════════════════════════════════════════════════════════
 // BIND
 // ══════════════════════════════════════════════════════════════════════════════
-window._mailSent = (oid, stepId, isRelance) => setTimeout(()=>markMailSent(oid,stepId,isRelance), 300);
 
 function bindLogin() {
   const btn=document.getElementById("l-btn"), emailEl=document.getElementById("l-email"), passEl=document.getElementById("l-pass");
@@ -2106,9 +2330,6 @@ function bindOrderCards() {
     const oid=parseInt(btn.dataset.oid), stepId=btn.dataset.step;
     toggleStep(oid, stepId, (S.steps[oid]||{})[stepId]?.done||false);
   }));
-  document.querySelectorAll(".fourn-chip").forEach(btn=>btn.addEventListener("click", e=>{
-    e.stopPropagation(); setFournisseur(parseInt(btn.dataset.oid), btn.dataset.step, btn.dataset.fourn);
-  }));
   document.querySelectorAll("[data-type]").forEach(btn=>btn.addEventListener("click", e=>{
     e.stopPropagation(); setDeliveryType(parseInt(btn.dataset.oid), btn.dataset.type);
   }));
@@ -2146,6 +2367,14 @@ function bindOrderCards() {
     const order = S.orders.find(o => o.id === oid);
     const step  = STEPS.find(s => s.id === stepId);
     if (order && step) openSupplierCartModal(order, step.label, stepId, getProgress(oid));
+  }));
+  document.querySelectorAll("[data-reminder-oid]").forEach(btn=>btn.addEventListener("click", e=>{
+    e.stopPropagation();
+    const oid = parseInt(btn.dataset.reminderOid);
+    const stepId = btn.dataset.reminderStep;
+    const supplierKey = btn.dataset.reminderSupplier;
+    const order = S.orders.find(o => o.id === oid);
+    if (order && supplierKey) openReminderModal(order, stepId, supplierKey);
   }));
 }
 
