@@ -9,7 +9,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="messages.js?v=1776710726"></script>
+<script src="messages.js?v=1776776084"></script>
+<script src="supplier_templates.js?v=1776776084"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -374,6 +375,154 @@ header {
   .modal-card { max-width:none; height:100dvh; max-height:100dvh; border-radius:0; border:none; }
 }
 
+/* ── NAV BADGE ── */
+.nav-badge {
+  margin-left:auto; background:rgba(239,68,68,.2); color:#fecaca;
+  border:1px solid rgba(239,68,68,.4); border-radius:99px;
+  padding:1px 8px; font-size:11px; font-family:var(--mono); font-weight:700;
+  min-width:20px; text-align:center;
+}
+.nav-badge.zero { background:rgba(100,116,139,.15); color:var(--muted); border-color:var(--border); }
+
+/* ── MAIL BTN SUPPLIER (reuse .mail-btn) ── */
+.mail-btn.mail-supplier {
+  background:rgba(168,85,247,.15); color:#ddd6fe; border:1px solid rgba(168,85,247,.35);
+}
+.mail-btn.mail-supplier:hover { background:rgba(168,85,247,.25); }
+.mail-btn.mail-supplier.has-sent { background:rgba(74,222,128,.14); color:#bbf7d0; border-color:rgba(74,222,128,.35); }
+
+/* ── SETTINGS — bloc fournisseur étendu ── */
+.fourn-row.extended { align-items:stretch; }
+.fourn-row.extended .fo-grid {
+  display:grid; grid-template-columns:1fr; gap:8px;
+}
+@media (min-width:700px) {
+  .fourn-row.extended .fo-grid { grid-template-columns:1fr 1fr; }
+  .fourn-row.extended .fo-grid .full { grid-column:1 / -1; }
+}
+.fo-label {
+  font-family:var(--mono); font-size:11px; color:var(--muted);
+  letter-spacing:.06em; text-transform:uppercase; margin-bottom:4px; display:block;
+}
+.fo-textarea {
+  width:100%; background:var(--bg3); border:1px solid var(--border); color:var(--text);
+  padding:9px 11px; border-radius:8px; font-size:13px; font-family:var(--sans);
+  outline:none; min-height:72px; resize:vertical;
+}
+.fo-inline-row {
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  font-family:var(--mono); font-size:13px; color:var(--text);
+}
+.fo-inline-row input[type=checkbox] { accent-color:var(--accent); width:16px; height:16px; }
+.fo-group-head {
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  margin-bottom:6px;
+}
+
+/* ── SUPPLIER CARTS VIEW ── */
+#supplier-carts-screen { flex:1; padding:14px 12px 28px; max-width:900px; margin:0 auto; width:100%; }
+.supplier-cards { display:flex; flex-direction:column; gap:14px; }
+.supplier-card {
+  background:var(--bg2); border:1px solid var(--border); border-radius:14px; overflow:hidden;
+}
+.supplier-card.empty { opacity:.55; }
+.supplier-card-head {
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  padding:14px 16px; border-bottom:1px solid var(--border);
+  background:linear-gradient(to bottom, rgba(168,85,247,.06), transparent);
+}
+.supplier-card-head .sc-title {
+  font-family:var(--mono); font-weight:700; color:var(--accent); font-size:15px; letter-spacing:.04em;
+}
+.supplier-card-head .sc-schedule { font-size:11px; color:var(--muted); font-family:var(--mono); margin-top:2px; letter-spacing:.03em; }
+.supplier-card-head .sc-count {
+  background:rgba(168,85,247,.18); color:#ddd6fe; border:1px solid rgba(168,85,247,.35);
+  border-radius:99px; padding:3px 10px; font-family:var(--mono); font-size:12px; font-weight:700;
+}
+.supplier-card-head .sc-count.zero { background:rgba(100,116,139,.12); color:var(--muted); border-color:var(--border); }
+.supplier-card-body { padding:6px 8px; }
+.supplier-card-item {
+  display:flex; align-items:center; gap:8px;
+  padding:8px 8px; border-radius:8px;
+}
+.supplier-card-item:not(:last-child) { border-bottom:1px solid rgba(255,255,255,.04); }
+.sci-label {
+  flex:1; min-width:0; background:transparent; border:1px solid transparent;
+  color:var(--text); padding:6px 8px; border-radius:6px; font-size:14px;
+  font-family:var(--sans); outline:none;
+}
+.sci-label:focus, .sci-label:hover { border-color:rgba(255,255,255,.12); background:var(--bg3); }
+.sci-qty {
+  width:66px; background:var(--bg3); border:1px solid var(--border); color:var(--text);
+  padding:6px 8px; border-radius:6px; text-align:right; font-family:var(--mono); font-size:13px; outline:none;
+}
+.sci-ref { font-family:var(--mono); font-size:11px; color:var(--muted); white-space:nowrap; }
+.sci-del {
+  background:none; border:none; color:var(--muted); font-size:16px; padding:4px 8px;
+  border-radius:6px; cursor:pointer; line-height:1;
+}
+.sci-del:hover { color:var(--red); background:rgba(239,68,68,.1); }
+.supplier-card-footer {
+  display:flex; gap:8px; padding:10px 12px; border-top:1px solid var(--border);
+  background:rgba(255,255,255,.02);
+}
+.supplier-card-footer button { flex:1; padding:10px 14px; border-radius:8px; font-size:13px; font-family:var(--mono); border:1px solid; }
+.btn-send-cart {
+  background:rgba(74,222,128,.16); color:#bbf7d0; border-color:rgba(74,222,128,.35);
+}
+.btn-send-cart:hover:not(:disabled) { background:rgba(74,222,128,.24); }
+.btn-send-cart:disabled { opacity:.4; cursor:not-allowed; }
+.btn-clear-cart {
+  background:rgba(239,68,68,.08); color:var(--red); border-color:rgba(239,68,68,.25); flex:0 0 auto;
+}
+
+/* ── SUPPLIER CART MODAL ── */
+.supplier-line-row {
+  display:flex; align-items:center; gap:8px;
+  padding:6px 0; border-bottom:1px solid rgba(255,255,255,.04);
+}
+.supplier-line-row input[type=checkbox] {
+  width:18px; height:18px; accent-color:var(--accent); flex-shrink:0;
+}
+.supplier-line-row .sl-label {
+  flex:1; min-width:0; background:var(--bg3); border:1px solid var(--border);
+  color:var(--text); padding:7px 9px; border-radius:6px; font-size:13px; outline:none;
+}
+.supplier-line-row .sl-qty {
+  width:60px; background:var(--bg3); border:1px solid var(--border); color:var(--text);
+  padding:7px 8px; border-radius:6px; text-align:right; font-family:var(--mono); font-size:13px; outline:none;
+}
+.supplier-line-row .sl-del {
+  background:none; border:none; color:var(--muted); font-size:15px; padding:4px 8px;
+  border-radius:6px; cursor:pointer;
+}
+.supplier-line-row .sl-del:hover { color:var(--red); }
+.supplier-radio-row { display:flex; flex-wrap:wrap; gap:8px; }
+.supplier-radio-row label {
+  display:inline-flex; align-items:center; gap:6px;
+  background:var(--bg3); border:1px solid var(--border); color:var(--text);
+  padding:8px 12px; border-radius:99px; font-family:var(--mono); font-size:13px; cursor:pointer;
+}
+.supplier-radio-row label.selected {
+  background:rgba(168,85,247,.2); color:#ede9fe; border-color:rgba(168,85,247,.45);
+}
+.supplier-radio-row input { accent-color:var(--accent); }
+.btn-add-line {
+  background:transparent; border:1px dashed var(--border); color:var(--muted);
+  padding:9px 12px; border-radius:8px; font-family:var(--mono); font-size:13px; width:100%;
+}
+.btn-add-line:hover { border-color:var(--accent); color:var(--accent); }
+.btn-modal-cart-add {
+  background:rgba(245,158,11,.16); color:#fcd34d; border-color:rgba(245,158,11,.35);
+}
+.btn-modal-cart-add:hover:not(:disabled) { background:rgba(245,158,11,.26); }
+
+/* Preview modal */
+.preview-box {
+  max-height:280px; overflow:auto; border:1px solid var(--border);
+  border-radius:8px; padding:12px; background:#fff; color:#222;
+}
+
 /* ── LOADING ── */
 .loading { text-align:center; padding:48px 16px; color:var(--muted); font-family:var(--mono); font-size:14px; }
 .spinner { display:inline-block; width:24px; height:24px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; margin-bottom:12px; }
@@ -432,6 +581,10 @@ let S = {
   loginEmail:"", loginPass:"", loginError:"",
   archivePending: new Set(), // order_ids en attente de confirmation archivage
   userMenuOpen: false,
+  // --- supplier cart ---
+  suppliersByKey: {},        // { 'viral': { key, name, email, cc, template_*, mail_mode, ... } }
+  supplierCartItems: [],     // items en attente (sent_at NULL) de tous les fournisseurs
+  supplierSentIndex: new Set(), // "oid|stepId" pour lesquels au moins un envoi a déjà été fait
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -446,6 +599,16 @@ async function sbGet(table, eq) {
   if (error) throw error;
   return data || [];
 }
+
+// Slug stable pour un nom d'affichage fournisseur.
+// "Surf System" → "surf_system", "FCS" → "fcs"
+function supplierNameToKey(name) {
+  if (!name) return null;
+  return String(name).toLowerCase().trim().replace(/\s+/g, "_");
+}
+
+// Jours de la semaine (1 = lundi, 7 = dimanche)
+const WEEKDAYS_FR = ["", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"];
 
 // ══════════════════════════════════════════════════════════════════════════════
 // AUTH
@@ -469,14 +632,60 @@ async function checkSession() {
 // ══════════════════════════════════════════════════════════════════════════════
 async function loadAll() {
   S.loading = true; render();
-  await Promise.all([loadFournisseurs(), loadStepsAndMeta(), syncOdoo()]);
+  await Promise.all([loadFournisseurs(), loadStepsAndMeta(), syncOdoo(), loadSupplierCart()]);
   S.loading = false; render();
 }
 
 async function loadFournisseurs() {
   const data = await sbGet("fournisseurs");
   S.fournisseurs = {};
-  data.forEach(f => S.fournisseurs[f.name] = { email:f.email||"", phone:f.phone||"", contact:f.contact_nom||"", id:f.id });
+  S.suppliersByKey = {};
+  data.forEach(f => {
+    S.fournisseurs[f.name] = { email:f.email||"", phone:f.phone||"", contact:f.contact_nom||"", id:f.id };
+    const key = f.key || supplierNameToKey(f.name);
+    if (key) {
+      S.suppliersByKey[key] = {
+        id: f.id,
+        key,
+        name: f.name || "",
+        email: f.email || "",
+        phone: f.phone || "",
+        contact_nom: f.contact_nom || "",
+        cc: Array.isArray(f.cc) ? f.cc : [],
+        delai_livraison_jours: f.delai_livraison_jours ?? 7,
+        mail_mode: f.mail_mode || "instantané",
+        mail_jour: f.mail_jour ?? 1,
+        mail_heure: f.mail_heure || "08:00:00",
+        template_subject: f.template_subject || (window.SUPPLIER_TEMPLATES?.defaultSubject || "Commande NOTOX — {date}"),
+        template_header:  f.template_header  || (window.SUPPLIER_TEMPLATES?.defaultHeader  || "Bonjour,\n\nVoici notre commande :"),
+        template_footer:  f.template_footer  || (window.SUPPLIER_TEMPLATES?.defaultFooter  || "Merci,\nNOTOX"),
+        notes: f.notes || "",
+        active: f.active !== false,
+      };
+    }
+  });
+}
+
+async function loadSupplierCart() {
+  // On charge TOUS les items (pending + envoyés) pour pouvoir afficher les
+  // indicateurs "déjà envoyé" sur les étapes. Volume faible attendu.
+  const { data, error } = await sb.from("supplier_cart_items").select("*").order("added_at", { ascending: true });
+  if (error) { console.warn("loadSupplierCart:", error); S.supplierCartItems = []; S.supplierSentIndex = new Set(); return; }
+  S.supplierCartItems = (data || []).filter(it => !it.sent_at);
+  S.supplierSentIndex = new Set();
+  (data || []).forEach(it => {
+    if (it.sent_at && it.order_id != null && it.step_id) {
+      S.supplierSentIndex.add(`${it.order_id}|${it.step_id}`);
+    }
+  });
+}
+
+function pendingItemsForSupplier(key) {
+  return S.supplierCartItems.filter(it => it.supplier_key === key);
+}
+
+function totalPendingCartCount() {
+  return S.supplierCartItems.length;
 }
 
 async function loadStepsAndMeta() {
@@ -670,14 +879,6 @@ async function recordClientEmailSent(order, stepId) {
   try {
     await sb.from("order_meta").upsert({ order_id:order.id, order_name:order.name||"", emails_sent }, { onConflict:"order_id" });
   } catch(e) { console.warn("emails_sent upsert:", e); }
-}
-
-async function saveFournisseurs(newF) {
-  S.fournisseurs = newF;
-  for (const [name, val] of Object.entries(newF)) {
-    await sb.from("fournisseurs").upsert({ name, email:val.email, phone:val.phone, contact_nom:val.contact }, { onConflict:"name" });
-  }
-  showToast("✓ Fournisseurs sauvegardés"); render();
 }
 
 async function downloadOrderPdf(orderId, orderName, btn) {
@@ -944,6 +1145,510 @@ function openClientMessageModal(order, stepLabel, stepId, progress) {
   setTimeout(() => subjectEl?.focus(), 50);
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// SUPPLIER CART
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Construit les items pré-remplis depuis les lignes Odoo (voir Décision 2) :
+// line_section ignorée, line_note concaténée dans le libellé du produit précédent.
+function buildInitialSupplierItems(order) {
+  const lines = order.lines_detail || [];
+  const items = [];
+  let current = null;
+  for (const l of lines) {
+    const dt = l.display_type;
+    if (dt === "line_section") { current = null; continue; }
+    if (dt === "line_note") {
+      if (current) {
+        const noteText = (l.name || "").trim();
+        if (noteText) current.labelParts.push(noteText);
+      }
+      continue;
+    }
+    // produit
+    const baseLabel = l.product_id?.[1] || l.name || "";
+    current = {
+      id: `odoo-${l.id}`,
+      source: "odoo",
+      baseLabel,
+      labelParts: [],
+      qty: Number(l.product_uom_qty) || 1,
+      checked: true,
+    };
+    items.push(current);
+  }
+  return items.map(it => ({
+    id: it.id,
+    source: it.source,
+    label: it.labelParts.length ? it.labelParts.join(" — ") : it.baseLabel,
+    qty: it.qty,
+    checked: it.checked,
+  }));
+}
+
+function openSupplierCartModal(order, stepLabel, stepId, progress) {
+  const step = STEPS.find(s => s.id === stepId);
+  const allowedNames = (step && step.fourn) || [];
+  if (allowedNames.length === 0) { showToast("⚠ Pas de fournisseur pour cette étape"); return; }
+
+  // Fournisseurs autorisés (même manquants dans suppliersByKey, on les liste)
+  const candidates = allowedNames.map(n => {
+    const key = supplierNameToKey(n);
+    const row = S.suppliersByKey[key] || null;
+    return { name: n, key, row };
+  }).filter(c => !c.row || c.row.active !== false);
+
+  let selectedKey = candidates[0]?.key || null;
+  let lines = buildInitialSupplierItems(order);
+  // manualIds pour générer des ids uniques sur les lignes manuelles
+  let manualCounter = 0;
+
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal-card" role="dialog" aria-modal="true">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span class="modal-title-icon" aria-hidden="true">📦</span>
+          <span class="modal-title-text">
+            <span>Commande fournisseur</span>
+            <small>${escapeHtml(order.name||"")} · ${escapeHtml(stepLabel)}</small>
+          </span>
+        </div>
+        <button class="modal-close" data-close aria-label="Fermer">×</button>
+      </div>
+      <div class="modal-body">
+        <div>
+          <label class="field-label">Fournisseur</label>
+          <div class="supplier-radio-row" id="sc-radios"></div>
+        </div>
+        <div>
+          <label class="field-label">Lignes de la commande client</label>
+          <div id="sc-lines"></div>
+          <button type="button" class="btn-add-line" id="sc-add-line">+ Ajouter une ligne manuelle</button>
+        </div>
+        <div>
+          <label class="field-label" for="sc-notes">Notes (optionnel)</label>
+          <input id="sc-notes" class="field-input" type="text" placeholder="Contexte, instructions…">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-modal-cancel" data-close>Annuler</button>
+        <button class="btn-modal-cart-add" id="sc-btn-add">🧺 Ajouter au panier</button>
+        <button class="btn-modal-send" id="sc-btn-send">📨 Envoyer maintenant</button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(overlay);
+  document.body.style.overflow = "hidden";
+  document.body.style.position = "fixed";
+  document.body.style.width = "100%";
+
+  const radiosEl = overlay.querySelector("#sc-radios");
+  const linesEl  = overlay.querySelector("#sc-lines");
+  const notesEl  = overlay.querySelector("#sc-notes");
+  const btnAdd   = overlay.querySelector("#sc-btn-add");
+  const btnSend  = overlay.querySelector("#sc-btn-send");
+
+  function renderRadios() {
+    radiosEl.innerHTML = candidates.map(c => {
+      const has = !!c.row && !!c.row.email;
+      const warn = !has ? ` <span style="color:var(--red);font-size:11px;">⚠ email manquant</span>` : "";
+      return `<label class="${selectedKey===c.key?"selected":""}">
+        <input type="radio" name="sc-supplier" value="${c.key}" ${selectedKey===c.key?"checked":""}>
+        ${escapeHtml(c.name)}${warn}
+      </label>`;
+    }).join("");
+    radiosEl.querySelectorAll("input[type=radio]").forEach(inp => {
+      inp.addEventListener("change", () => { selectedKey = inp.value; renderRadios(); });
+    });
+  }
+
+  function renderLines() {
+    linesEl.innerHTML = lines.map((l, i) => `
+      <div class="supplier-line-row" data-idx="${i}">
+        <input type="checkbox" data-chk="${i}" ${l.checked?"checked":""}>
+        <input class="sl-label" data-lbl="${i}" type="text" value="${escapeHtml(l.label||"")}">
+        <input class="sl-qty"   data-qty="${i}" type="number" min="0" step="0.01" value="${l.qty}">
+        ${l.source==="manual" ? `<button class="sl-del" data-del="${i}" type="button" aria-label="Supprimer">×</button>` : ""}
+      </div>
+    `).join("") || `<div style="color:var(--muted); font-size:13px; padding:8px 0;">Aucune ligne produit détectée. Ajoute une ligne manuelle.</div>`;
+
+    linesEl.querySelectorAll("[data-chk]").forEach(el => el.addEventListener("change", e => {
+      lines[parseInt(el.dataset.chk)].checked = e.target.checked;
+    }));
+    linesEl.querySelectorAll("[data-lbl]").forEach(el => el.addEventListener("input", e => {
+      lines[parseInt(el.dataset.lbl)].label = e.target.value;
+    }));
+    linesEl.querySelectorAll("[data-qty]").forEach(el => el.addEventListener("input", e => {
+      const v = parseFloat(e.target.value); lines[parseInt(el.dataset.qty)].qty = isFinite(v) ? v : 0;
+    }));
+    linesEl.querySelectorAll("[data-del]").forEach(el => el.addEventListener("click", () => {
+      lines.splice(parseInt(el.dataset.del), 1); renderLines();
+    }));
+  }
+
+  renderRadios();
+  renderLines();
+
+  overlay.querySelector("#sc-add-line").addEventListener("click", () => {
+    manualCounter += 1;
+    lines.push({ id:`manual-${Date.now()}-${manualCounter}`, source:"manual", label:"", qty:1, checked:true });
+    renderLines();
+    const last = linesEl.querySelector(`[data-lbl="${lines.length-1}"]`);
+    last?.focus();
+  });
+
+  function close() {
+    document.body.style.overflow = "";
+    document.body.style.position = "";
+    document.body.style.width = "";
+    overlay.remove();
+    document.removeEventListener("keydown", onKey);
+  }
+  function onKey(e) { if (e.key === "Escape") close(); }
+  document.addEventListener("keydown", onKey);
+  overlay.querySelectorAll("[data-close]").forEach(b => b.addEventListener("click", close));
+  overlay.addEventListener("click", e => { if (e.target === overlay) close(); });
+
+  function collectSelection() {
+    if (!selectedKey) { showToast("⚠ Choisis un fournisseur"); return null; }
+    const picked = lines.filter(l => l.checked && (l.label||"").trim() && Number(l.qty) > 0);
+    if (picked.length === 0) { showToast("⚠ Aucune ligne cochée"); return null; }
+    return { key:selectedKey, picked, notes: notesEl.value.trim() };
+  }
+
+  async function insertIntoCart(key, picked, notes) {
+    const rows = picked.map(l => ({
+      supplier_key: key,
+      order_id: order.id,
+      order_ref: order.name || null,
+      step_id: stepId,
+      product_label: l.label.trim(),
+      qty: Number(l.qty) || 1,
+      source: l.source,
+      notes: notes || null,
+      added_by: S.user?.email || null,
+    }));
+    const { data, error } = await sb.from("supplier_cart_items").insert(rows).select();
+    if (error) throw error;
+    // refresh local state
+    (data || []).forEach(r => S.supplierCartItems.push(r));
+    return data || [];
+  }
+
+  btnAdd.addEventListener("click", async () => {
+    const sel = collectSelection(); if (!sel) return;
+    btnAdd.disabled = true; btnAdd.textContent = "…";
+    try {
+      const inserted = await insertIntoCart(sel.key, sel.picked, sel.notes);
+      close();
+      const supplierName = S.suppliersByKey[sel.key]?.name || sel.key;
+      showToast(`✓ ${inserted.length} article(s) ajouté(s) au panier ${supplierName}`);
+      render();
+    } catch (err) {
+      console.error(err);
+      btnAdd.disabled = false; btnAdd.textContent = "🧺 Ajouter au panier";
+      showToast("⚠ Erreur : " + (err.message || err));
+    }
+  });
+
+  btnSend.addEventListener("click", async () => {
+    const sel = collectSelection(); if (!sel) return;
+    const supplier = S.suppliersByKey[sel.key];
+    if (!supplier || !supplier.email) { showToast("⚠ Email fournisseur manquant — renseigne-le dans Réglages"); return; }
+    btnSend.disabled = true; btnSend.innerHTML = `<span class="spinner-xs"></span> Envoi…`;
+    try {
+      const inserted = await insertIntoCart(sel.key, sel.picked, sel.notes);
+      // On envoie uniquement les items de CETTE insertion (et pas tout le panier cumulé)
+      const itemsToSend = inserted.map(r => ({
+        id: r.id,
+        product_label: r.product_label,
+        qty: Number(r.qty) || 1,
+        order_ref: r.order_ref || null,
+      }));
+      const result = await sendSupplierBatch(supplier, itemsToSend);
+      close();
+      if (!result.warning) {
+        showToast(`✓ Envoyé à ${supplier.name} — ${itemsToSend.length} article${itemsToSend.length>1?"s":""}`);
+      }
+      render();
+    } catch (err) {
+      console.error(err);
+      btnSend.disabled = false; btnSend.innerHTML = "📨 Envoyer maintenant";
+      showToast("⚠ Échec envoi mail : " + (err.message || err));
+    }
+  });
+}
+
+// Envoie un batch au backend /supplier-cart/send puis met à jour Supabase.
+// itemsToSend : [{ id, product_label, qty, order_ref }]  — IDs doivent être valides dans supplier_cart_items.
+//
+// Atomicité :
+//  - Backend KO → throw (caller affiche "Envoi échoué"). Aucune écriture Supabase.
+//  - Backend OK mais update cart_items KO → mail parti, showToast WARNING explicite, return {warning}.
+//  - Backend OK + update OK mais insert log KO → mail parti + items marqués sent,
+//    showToast WARNING moins grave, return {warning}.
+// Dans tous les cas post-envoi, loadSupplierCart() est rejoué (try/finally) pour refresh l'UI.
+async function sendSupplierBatch(supplier, itemsToSend) {
+  if (!supplier?.email) throw new Error("Email fournisseur manquant");
+  if (!itemsToSend || itemsToSend.length === 0) throw new Error("Aucun article à envoyer");
+
+  const ctx = { date: window.SUPPLIER_TEMPLATES.formatDate(), supplier_name: supplier.name };
+  const subject = window.SUPPLIER_TEMPLATES.applyPlaceholders(supplier.template_subject || window.SUPPLIER_TEMPLATES.defaultSubject, ctx);
+  const header  = window.SUPPLIER_TEMPLATES.applyPlaceholders(supplier.template_header  || window.SUPPLIER_TEMPLATES.defaultHeader,  ctx);
+  const footer  = window.SUPPLIER_TEMPLATES.applyPlaceholders(supplier.template_footer  || window.SUPPLIER_TEMPLATES.defaultFooter,  ctx);
+
+  const payload = {
+    supplier_key:  supplier.key,
+    supplier_name: supplier.name,
+    supplier_email: supplier.email,
+    cc: supplier.cc || [],
+    subject, header, footer,
+    items: itemsToSend,
+    sent_by: S.user?.email || null,
+  };
+
+  // ── Étape 1 : backend (envoi SMTP). Si KO → throw normal (aucune écriture Supabase).
+  const resp = await fetch(`${CONFIG.backendUrl}/supplier-cart/send`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-api-secret": CONFIG.apiSecret },
+    body: JSON.stringify(payload),
+  });
+  if (!resp.ok) {
+    const txt = await resp.text().catch(() => "");
+    throw new Error(`HTTP ${resp.status}${txt ? " — " + txt.slice(0, 240) : ""}`);
+  }
+  const out = await resp.json();
+  const batchId = out.batch_id;
+  const sentAt  = out.sent_at || new Date().toISOString();
+
+  // ── À partir d'ici le mail est PARTI. Les erreurs Supabase sont des warnings, pas des throws.
+  let warning = null;
+  try {
+    const ids = itemsToSend.map(it => it.id);
+    const { error: upErr } = await sb
+      .from("supplier_cart_items")
+      .update({ sent_at: sentAt, batch_id: batchId })
+      .in("id", ids);
+    if (upErr) {
+      console.error("update supplier_cart_items failed:", upErr);
+      warning = `⚠️ Mail envoyé à ${supplier.name} (batch=${batchId}) mais sauvegarde panier échouée. Vérifie la vue Paniers et purge les éventuels doublons.`;
+    } else {
+      const { error: logErr } = await sb.from("supplier_messages_log").insert({
+        batch_id: batchId,
+        supplier_key: supplier.key,
+        supplier_email: supplier.email,
+        subject: out.subject || subject,
+        body_html: out.body_html || null,
+        item_count: out.item_count || ids.length,
+        sent_by: S.user?.email || null,
+      });
+      if (logErr) {
+        console.error("insert supplier_messages_log failed:", logErr);
+        warning = `⚠️ Mail envoyé (batch=${batchId}) mais historique non enregistré. Les items sont bien marqués sent.`;
+      }
+    }
+  } finally {
+    try { await loadSupplierCart(); }
+    catch (e) { console.warn("loadSupplierCart refresh failed:", e); }
+  }
+
+  if (warning) showToast(warning);
+  return { out, batchId, warning };
+}
+
+// ── Vue "Paniers fournisseurs" ─────────────────────────────────────────────
+function renderSupplierCarts() {
+  const keys = Object.keys(S.suppliersByKey).filter(k => S.suppliersByKey[k].active !== false);
+  // Tri : non vides d'abord
+  keys.sort((a, b) => {
+    const ca = pendingItemsForSupplier(a).length;
+    const cb = pendingItemsForSupplier(b).length;
+    if (cb !== ca) return cb - ca;
+    return (S.suppliersByKey[a].name || "").localeCompare(S.suppliersByKey[b].name || "");
+  });
+
+  const cards = keys.map(k => {
+    const sup = S.suppliersByKey[k];
+    const items = pendingItemsForSupplier(k);
+    const count = items.length;
+    const schedule = sup.mail_mode === "hebdo"
+      ? `Envoi groupé — ${WEEKDAYS_FR[sup.mail_jour] || "?"} ${String(sup.mail_heure||"").slice(0,5)}`
+      : "";
+
+    const itemsHtml = count === 0
+      ? `<div style="color:var(--muted); font-size:13px; padding:14px 8px;">Aucun article en attente.</div>`
+      : items.map(it => `
+          <div class="supplier-card-item" data-id="${it.id}">
+            <input class="sci-label" data-id="${it.id}" type="text" value="${escapeHtml(it.product_label||"")}">
+            <input class="sci-qty"   data-id="${it.id}" data-field="qty" type="number" min="0" step="0.01" value="${Number(it.qty)||0}">
+            <span class="sci-ref">${it.order_ref ? escapeHtml(it.order_ref) : (it.source==="manual"?"manuel":"—")}</span>
+            <button class="sci-del" data-del="${it.id}" type="button" title="Retirer">×</button>
+          </div>
+        `).join("");
+
+    const missingEmail = !sup.email;
+    return `
+      <div class="supplier-card${count===0?" empty":""}" data-supplier-key="${k}">
+        <div class="supplier-card-head">
+          <div>
+            <div class="sc-title">🏭 ${escapeHtml(sup.name)}</div>
+            ${schedule ? `<div class="sc-schedule">${escapeHtml(schedule)}</div>` : ""}
+            ${missingEmail ? `<div class="sc-schedule" style="color:var(--red)">⚠ email manquant — Réglages</div>` : ""}
+          </div>
+          <span class="sc-count${count===0?" zero":""}">${count} article${count>1?"s":""}</span>
+        </div>
+        <div class="supplier-card-body">${itemsHtml}</div>
+        <div class="supplier-card-footer">
+          <button class="btn-send-cart" data-send-cart="${k}" ${count===0||missingEmail?"disabled":""}>📨 Envoyer le panier</button>
+          <button class="btn-clear-cart" data-clear-cart="${k}" ${count===0?"disabled":""}>Vider</button>
+        </div>
+      </div>`;
+  }).join("") || `<div class="empty-state"><div class="empty-icon">📦</div><div class="empty-text">Aucun fournisseur configuré</div></div>`;
+
+  return `<div id="supplier-carts-screen">
+    <div class="settings-title" style="margin-bottom:14px;">📦 PANIERS FOURNISSEURS</div>
+    <div class="supplier-cards">${cards}</div>
+  </div>`;
+}
+
+function bindSupplierCarts() {
+  bindNav();
+
+  // Edit inline label / qty (blur = save)
+  document.querySelectorAll(".sci-label").forEach(inp => inp.addEventListener("blur", async e => {
+    const id = inp.dataset.id; const val = e.target.value.trim();
+    if (!val) return;
+    const { error } = await sb.from("supplier_cart_items").update({ product_label: val }).eq("id", id);
+    if (error) { console.warn(error); showToast("⚠ Maj label échouée"); return; }
+    const row = S.supplierCartItems.find(r => r.id === id); if (row) row.product_label = val;
+  }));
+  document.querySelectorAll(".sci-qty").forEach(inp => inp.addEventListener("blur", async e => {
+    const id = inp.dataset.id; const qty = parseFloat(e.target.value);
+    if (!isFinite(qty) || qty <= 0) { showToast("⚠ Quantité invalide"); return; }
+    const { error } = await sb.from("supplier_cart_items").update({ qty }).eq("id", id);
+    if (error) { console.warn(error); showToast("⚠ Maj qty échouée"); return; }
+    const row = S.supplierCartItems.find(r => r.id === id); if (row) row.qty = qty;
+  }));
+  document.querySelectorAll("[data-del]").forEach(btn => btn.addEventListener("click", async () => {
+    const id = btn.dataset.del;
+    const { error } = await sb.from("supplier_cart_items").delete().eq("id", id);
+    if (error) { showToast("⚠ Suppression échouée"); return; }
+    S.supplierCartItems = S.supplierCartItems.filter(r => r.id !== id);
+    render();
+  }));
+  document.querySelectorAll("[data-clear-cart]").forEach(btn => btn.addEventListener("click", async () => {
+    const key = btn.dataset.clearCart;
+    if (!confirm(`Vider le panier ${S.suppliersByKey[key]?.name || key} ?`)) return;
+    const { error } = await sb.from("supplier_cart_items").delete().eq("supplier_key", key).is("sent_at", null);
+    if (error) { showToast("⚠ Vidage échoué"); return; }
+    S.supplierCartItems = S.supplierCartItems.filter(r => r.supplier_key !== key);
+    render();
+  }));
+  document.querySelectorAll("[data-send-cart]").forEach(btn => btn.addEventListener("click", async () => {
+    const key = btn.dataset.sendCart;
+    const supplier = S.suppliersByKey[key];
+    if (!supplier) return;
+    const items = pendingItemsForSupplier(key);
+    if (items.length === 0) return;
+    openSupplierSendPreview(supplier, items);
+  }));
+}
+
+function openSupplierSendPreview(supplier, items) {
+  const ctx = { date: window.SUPPLIER_TEMPLATES.formatDate(), supplier_name: supplier.name };
+  const subject = window.SUPPLIER_TEMPLATES.applyPlaceholders(supplier.template_subject || window.SUPPLIER_TEMPLATES.defaultSubject, ctx);
+  const header  = window.SUPPLIER_TEMPLATES.applyPlaceholders(supplier.template_header  || window.SUPPLIER_TEMPLATES.defaultHeader,  ctx);
+  const footer  = window.SUPPLIER_TEMPLATES.applyPlaceholders(supplier.template_footer  || window.SUPPLIER_TEMPLATES.defaultFooter,  ctx);
+
+  const rowsHtml = items.map(it => {
+    const qtyS = (Number(it.qty)||0).toString().replace(/\.0+$/, "");
+    return `<tr>
+      <td style="border:1px solid #ccc;padding:8px;">${escapeHtml(it.product_label||"")}</td>
+      <td style="border:1px solid #ccc;padding:8px;text-align:right;">${qtyS}</td>
+      <td style="border:1px solid #ccc;padding:8px;">${escapeHtml(it.order_ref||"")}</td>
+    </tr>`;
+  }).join("");
+  const previewHtml = `
+    <div style="font-family:Arial, sans-serif; color:#222; font-size:14px; line-height:1.5;">
+      <p>${escapeHtml(header).replace(/\n/g,"<br>")}</p>
+      <table style="border-collapse:collapse; width:100%; margin:16px 0;">
+        <thead><tr style="background:#f0f0f0;">
+          <th style="border:1px solid #ccc; padding:8px; text-align:left;">Article</th>
+          <th style="border:1px solid #ccc; padding:8px; text-align:right;">Qté</th>
+          <th style="border:1px solid #ccc; padding:8px; text-align:left;">Réf commande</th>
+        </tr></thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+      <p>${escapeHtml(footer).replace(/\n/g,"<br>")}</p>
+    </div>`;
+
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal-card" role="dialog" aria-modal="true">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span class="modal-title-icon" aria-hidden="true">📨</span>
+          <span class="modal-title-text">
+            <span>Envoyer à ${escapeHtml(supplier.name)}</span>
+            <small>${escapeHtml(supplier.email)} · ${items.length} article${items.length>1?"s":""}</small>
+          </span>
+        </div>
+        <button class="modal-close" data-close>×</button>
+      </div>
+      <div class="modal-body">
+        <div>
+          <label class="field-label">Sujet</label>
+          <div style="font-family:var(--mono);font-size:13px;color:var(--text); padding:8px 10px; background:var(--bg3); border-radius:8px; border:1px solid var(--border);">${escapeHtml(subject)}</div>
+        </div>
+        <div>
+          <label class="field-label">Aperçu du mail</label>
+          <div class="preview-box">${previewHtml}</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-modal-cancel" data-close>Annuler</button>
+        <button class="btn-modal-send" id="confirm-send">📨 Envoyer</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  document.body.style.overflow = "hidden";
+  document.body.style.position = "fixed";
+  document.body.style.width = "100%";
+
+  function close() {
+    document.body.style.overflow = ""; document.body.style.position = ""; document.body.style.width = "";
+    overlay.remove();
+    document.removeEventListener("keydown", onKey);
+  }
+  function onKey(e) { if (e.key==="Escape") close(); }
+  document.addEventListener("keydown", onKey);
+  overlay.querySelectorAll("[data-close]").forEach(b => b.addEventListener("click", close));
+  overlay.addEventListener("click", e => { if (e.target === overlay) close(); });
+
+  overlay.querySelector("#confirm-send").addEventListener("click", async () => {
+    const btn = overlay.querySelector("#confirm-send");
+    btn.disabled = true; btn.innerHTML = `<span class="spinner-xs"></span> Envoi…`;
+    try {
+      const toSend = items.map(it => ({
+        id: it.id, product_label: it.product_label, qty: Number(it.qty)||1, order_ref: it.order_ref || null,
+      }));
+      const result = await sendSupplierBatch(supplier, toSend);
+      close();
+      if (!result.warning) {
+        showToast(`✓ Envoyé à ${supplier.name} — ${toSend.length} article${toSend.length>1?"s":""}`);
+      }
+      render();
+    } catch (err) {
+      console.error(err);
+      btn.disabled = false; btn.innerHTML = "📨 Envoyer";
+      showToast("⚠ Échec envoi mail : " + (err.message || err));
+    }
+  });
+}
+
 function showToast(msg) {
   const t = document.createElement("div"); t.className="toast"; t.textContent=msg;
   document.body.appendChild(t); setTimeout(()=>t.remove(), 2700);
@@ -973,6 +1678,7 @@ function render() {
   if (!sb)             { app.innerHTML=`<div class="loading"><div class="spinner"></div><br>Init...</div>`; return; }
   if (S.view==="login")    { app.innerHTML=renderLogin();              bindLogin();    return; }
   if (S.view==="settings") { app.innerHTML=renderShell(renderSettings()); bindSettings(); return; }
+  if (S.view==="supplier_carts") { app.innerHTML=renderShell(renderSupplierCarts()); bindSupplierCarts(); return; }
   app.innerHTML=renderShell(renderOrders());
   bindOrders();
 }
@@ -993,7 +1699,10 @@ function renderLogin() {
 function renderShell(content) {
   const isOrders   = S.view === "orders";
   const isSettings = S.view === "settings";
+  const isCarts    = S.view === "supplier_carts";
   const userName   = S.user?.email?.split("@")[0] || "";
+  const cartCount  = totalPendingCartCount();
+  const badgeCls   = cartCount > 0 ? "nav-badge" : "nav-badge zero";
   return `
   <header>
     <img src="garybot_logo.png" alt="GaryBot" class="gary-logo" onerror="this.style.display='none'">
@@ -1005,6 +1714,7 @@ function renderShell(content) {
         <div class="main-menu" role="menu">
           <div class="menu-header">${userName||"—"}</div>
           <button class="menu-item${isOrders?" active":""}" id="nav-orders" role="menuitem">✏️ Commandes</button>
+          <button class="menu-item${isCarts?" active":""}" id="nav-carts" role="menuitem">📦 Paniers<span class="${badgeCls}">${cartCount}</span></button>
           <button class="menu-item${isSettings?" active":""}" id="nav-settings" role="menuitem">⚙️ Réglages</button>
           <button class="menu-item" id="sync-btn" role="menuitem" ${S.syncing?"disabled":""}>♻️ ${S.syncing?"Sync…":"Sync Odoo"}</button>
           <div class="menu-divider"></div>
@@ -1129,6 +1839,12 @@ function renderCard(order) {
       clientHtml=`<button class="mail-btn mail-client" data-msg-oid="${oid}" data-msg-step="${step.id}" title="Écrire au client">✉️ client</button>`;
     }
 
+    let supplierBtnHtml = "";
+    if (step.fourn && isDone) {
+      const hasSent = S.supplierSentIndex.has(`${oid}|${step.id}`);
+      supplierBtnHtml=`<button class="mail-btn mail-supplier${hasSent?" has-sent":""}" data-supplier-oid="${oid}" data-supplier-step="${step.id}" title="Préparer commande fournisseur">📦 ${hasSent?"✓ ":""}fournisseur</button>`;
+    }
+
     let livrHtml = "";
     if (step.isLivraison) {
       const isRetrait = meta.delivery_type==="retrait";
@@ -1150,7 +1866,7 @@ function renderCard(order) {
       <div class="step-row-top">
         <button class="step-check" data-oid="${oid}" data-step="${step.id}">${isDone?"✅":"☑️"}</button>
         <span class="step-label">${step.label}</span>
-        ${clientHtml}
+        ${supplierBtnHtml}${clientHtml}
       </div>
       ${foHtml}${livrHtml}
     </div>`;
@@ -1197,19 +1913,92 @@ function renderCard(order) {
 function renderSettings() {
   const archivedOrders = S.orders.filter(o=>S.meta[o.id]?.archived);
   const archivedCount = archivedOrders.length;
-  const foRows = Object.entries(S.fournisseurs).map(([name,val])=>`
-    <div class="fourn-row">
-      <span class="fourn-name">${name}</span>
-      <input class="form-input" id="fo-email-${name}" type="email" placeholder="email" value="${val.email||""}">
-      <input class="form-input" id="fo-contact-${name}" placeholder="contact" value="${val.contact||""}">
-    </div>`).join("");
+
+  const supplierKeys = Object.keys(S.suppliersByKey).sort((a,b)=>
+    (S.suppliersByKey[a].name||"").localeCompare(S.suppliersByKey[b].name||""));
+
+  const foRows = supplierKeys.map(k => {
+    const s = S.suppliersByKey[k];
+    const ccStr = (s.cc || []).join(", ");
+    const mode = s.mail_mode || "instantané";
+    const isHebdo = mode === "hebdo";
+    const jour = Number(s.mail_jour) || 1;
+    const heure = (s.mail_heure || "08:00:00").slice(0,5);
+    const daysOpts = [1,2,3,4,5,6,7].map(d =>
+      `<option value="${d}" ${jour===d?"selected":""}>${WEEKDAYS_FR[d]}</option>`).join("");
+    return `
+    <div class="fourn-row extended" data-fo-key="${k}">
+      <div class="fo-group-head">
+        <span class="fourn-name">${escapeHtml(s.name)}</span>
+        <label class="fo-inline-row" style="gap:6px;"><input type="checkbox" data-fo-field="active" ${s.active!==false?"checked":""}> actif</label>
+      </div>
+      <div class="fo-grid">
+        <div>
+          <label class="fo-label">Email</label>
+          <input class="form-input" data-fo-field="email" type="email" placeholder="fournisseur@example.com" value="${escapeHtml(s.email||"")}">
+        </div>
+        <div>
+          <label class="fo-label">Cc (emails séparés par virgule)</label>
+          <input class="form-input" data-fo-field="cc" type="text" placeholder="ex: logistique@notox.com" value="${escapeHtml(ccStr)}">
+        </div>
+        <div>
+          <label class="fo-label">Contact</label>
+          <input class="form-input" data-fo-field="contact_nom" type="text" value="${escapeHtml(s.contact_nom||"")}">
+        </div>
+        <div>
+          <label class="fo-label">Téléphone</label>
+          <input class="form-input" data-fo-field="phone" type="text" value="${escapeHtml(s.phone||"")}">
+        </div>
+        <div>
+          <label class="fo-label">Délai livraison (jours)</label>
+          <input class="form-input" data-fo-field="delai_livraison_jours" type="number" min="0" value="${Number(s.delai_livraison_jours)||7}">
+        </div>
+        <div>
+          <label class="fo-label">Mode d'envoi</label>
+          <select class="form-input" data-fo-field="mail_mode">
+            <option value="instantané" ${mode==="instantané"?"selected":""}>Instantané</option>
+            <option value="hebdo" ${isHebdo?"selected":""}>Hebdomadaire</option>
+          </select>
+        </div>
+        <div data-hebdo-only ${isHebdo?"":"style=\"display:none;\""}>
+          <label class="fo-label">Jour d'envoi</label>
+          <select class="form-input" data-fo-field="mail_jour">${daysOpts}</select>
+        </div>
+        <div data-hebdo-only ${isHebdo?"":"style=\"display:none;\""}>
+          <label class="fo-label">Heure d'envoi</label>
+          <input class="form-input" data-fo-field="mail_heure" type="time" value="${escapeHtml(heure)}">
+        </div>
+        <div class="full">
+          <label class="fo-label">Sujet (template)</label>
+          <input class="form-input" data-fo-field="template_subject" type="text" value="${escapeHtml(s.template_subject||"")}">
+        </div>
+        <div class="full">
+          <label class="fo-label">En-tête (template)</label>
+          <textarea class="fo-textarea" data-fo-field="template_header">${escapeHtml(s.template_header||"")}</textarea>
+        </div>
+        <div class="full">
+          <label class="fo-label">Pied (template)</label>
+          <textarea class="fo-textarea" data-fo-field="template_footer">${escapeHtml(s.template_footer||"")}</textarea>
+        </div>
+        <div class="full">
+          <label class="fo-label">Notes internes</label>
+          <textarea class="fo-textarea" data-fo-field="notes" style="min-height:48px;">${escapeHtml(s.notes||"")}</textarea>
+        </div>
+      </div>
+      <div style="display:flex; gap:8px; margin-top:10px;">
+        <button class="btn-save" data-save-supplier="${k}">💾 Enregistrer ${escapeHtml(s.name)}</button>
+      </div>
+    </div>`;
+  }).join("");
 
   return `<div id="settings-screen">
     <div class="settings-title">⚙ CONFIGURATION</div>
     <div class="settings-section">
       <div class="section-title">FOURNISSEURS</div>
-      ${foRows}
-      <button class="btn-save" id="save-fourn-btn">Sauvegarder</button>
+      <div style="font-size:12px; color:var(--muted); margin-bottom:14px; font-family:var(--mono);">
+        Placeholders : <code>{date}</code>, <code>{supplier_name}</code>, <code>{order_ref}</code>, <code>{step_label}</code>.
+      </div>
+      ${foRows || `<div style="color:var(--muted)">Aucun fournisseur. Lance un sync.</div>`}
     </div>
     <div class="settings-section">
       <div class="section-title">ARCHIVAGE</div>
@@ -1265,6 +2054,7 @@ function bindLogin() {
 
 function bindNav() {
   document.getElementById("nav-orders")?.addEventListener("click", ()=>{ S.view="orders"; S.userMenuOpen=false; render(); });
+  document.getElementById("nav-carts")?.addEventListener("click", ()=>{ S.view="supplier_carts"; S.userMenuOpen=false; render(); });
   document.getElementById("nav-settings")?.addEventListener("click", ()=>{ S.view="settings"; S.userMenuOpen=false; render(); });
   document.getElementById("nav-logout")?.addEventListener("click", (e)=>{ e.stopPropagation(); S.userMenuOpen=false; logout(); });
   document.getElementById("sync-btn")?.addEventListener("click", async()=>{
@@ -1349,6 +2139,14 @@ function bindOrderCards() {
     const step  = STEPS.find(s => s.id === stepId);
     if (order && step) openClientMessageModal(order, step.label, stepId, getProgress(oid));
   }));
+  document.querySelectorAll("[data-supplier-oid]").forEach(btn=>btn.addEventListener("click", e=>{
+    e.stopPropagation();
+    const oid = parseInt(btn.dataset.supplierOid);
+    const stepId = btn.dataset.supplierStep;
+    const order = S.orders.find(o => o.id === oid);
+    const step  = STEPS.find(s => s.id === stepId);
+    if (order && step) openSupplierCartModal(order, step.label, stepId, getProgress(oid));
+  }));
 }
 
 function bindSettings() {
@@ -1363,13 +2161,54 @@ function bindSettings() {
     showToast("↩ Commande désarchivée");
     render();
   }));
-  document.getElementById("save-fourn-btn")?.addEventListener("click", async()=>{
-    const newF={};
-    for(const name of Object.keys(S.fournisseurs)) {
-      newF[name]={ email:document.getElementById(`fo-email-${name}`)?.value||"", phone:S.fournisseurs[name].phone||"", contact:document.getElementById(`fo-contact-${name}`)?.value||"" };
+
+  // Masquer/afficher les champs hebdo selon mail_mode
+  document.querySelectorAll('[data-fo-field="mail_mode"]').forEach(sel => sel.addEventListener("change", e => {
+    const row = e.target.closest("[data-fo-key]");
+    if (!row) return;
+    const show = e.target.value === "hebdo";
+    row.querySelectorAll("[data-hebdo-only]").forEach(el => { el.style.display = show ? "" : "none"; });
+  }));
+
+  // Save par fournisseur
+  document.querySelectorAll("[data-save-supplier]").forEach(btn => btn.addEventListener("click", async () => {
+    const key = btn.dataset.saveSupplier;
+    const row = document.querySelector(`[data-fo-key="${key}"]`);
+    if (!row) return;
+    const get = field => row.querySelector(`[data-fo-field="${field}"]`);
+    const current = S.suppliersByKey[key] || {};
+    const ccRaw = (get("cc")?.value || "").split(",").map(s=>s.trim()).filter(Boolean);
+    const payload = {
+      name: current.name,                      // clé de conflit
+      key,
+      email: get("email")?.value.trim() || "",
+      cc: ccRaw,
+      contact_nom: get("contact_nom")?.value.trim() || "",
+      phone: get("phone")?.value.trim() || "",
+      delai_livraison_jours: parseInt(get("delai_livraison_jours")?.value) || 7,
+      mail_mode: get("mail_mode")?.value || "instantané",
+      mail_jour: parseInt(get("mail_jour")?.value) || 1,
+      mail_heure: get("mail_heure")?.value || "08:00",
+      template_subject: get("template_subject")?.value || "",
+      template_header:  get("template_header")?.value || "",
+      template_footer:  get("template_footer")?.value || "",
+      notes: get("notes")?.value || "",
+      active: !!get("active")?.checked,
+      updated_at: new Date().toISOString(),
+    };
+    btn.disabled = true; const prevTxt = btn.textContent; btn.textContent = "…";
+    const { error } = await sb.from("fournisseurs").upsert(payload, { onConflict: "name" });
+    btn.disabled = false; btn.textContent = prevTxt;
+    if (error) { console.error(error); showToast("⚠ Sauvegarde échouée : " + error.message); return; }
+    // Refresh local state
+    Object.assign(S.suppliersByKey[key] || {}, payload);
+    if (S.fournisseurs[current.name]) {
+      S.fournisseurs[current.name].email = payload.email;
+      S.fournisseurs[current.name].phone = payload.phone;
+      S.fournisseurs[current.name].contact = payload.contact_nom;
     }
-    await saveFournisseurs(newF);
-  });
+    showToast(`✓ ${current.name} sauvegardé`);
+  }));
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

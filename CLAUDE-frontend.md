@@ -23,10 +23,11 @@ UI mobile-first pour :
 
 ```
 garybot/
-├── index.html       ← monolithe 1345 lignes (UI + état + bindings + styles)
-├── messages.js      ← templates texte brut des messages clients
+├── index.html              ← monolithe (UI + état + bindings + styles)
+├── messages.js             ← templates texte brut des messages clients
+├── supplier_templates.js   ← helpers templates mails fournisseurs (placeholders + defaults)
 ├── garybot_logo.png
-└── build.sh         ← cache-busting : injecte timestamp dans <script src="messages.js?v=...">
+└── build.sh                ← cache-busting : injecte timestamp dans messages.js?v=… et supplier_templates.js?v=…
 ```
 
 **Pas de framework, pas de bundler.** Vanilla JS, Supabase et fonts chargés via CDN.
@@ -56,9 +57,52 @@ Toute requête vers le backend passe par `fetch(CONFIG.backendUrl + "/...", { he
 - **State global** : objet `S` mutable, ré-rendu complet via `render()`.
 - **Templates** : template strings JavaScript (pas de JSX, pas de templating lib).
 - **Supabase client** : chargé via CDN, instancié dans `sb`.
-- **Pas de routing** : `S.view` = `"orders" | "settings" | "login"`.
+- **Pas de routing** : `S.view` = `"orders" | "settings" | "supplier_carts" | "login"`.
 - **Modals** : créés dynamiquement via `document.createElement` + `overlay.remove()`.
-- **Cache-busting obligatoire** après modif de `messages.js` : `./build.sh` avant commit.
+- **Cache-busting obligatoire** après modif de `messages.js` ou `supplier_templates.js` : `./build.sh` avant commit.
+
+---
+
+## Flow commandes fournisseurs (depuis 2026-04-21)
+
+### Vue "Paniers fournisseurs" (onglet 📦 Paniers)
+
+Accessible depuis le menu hamburger. `S.view === "supplier_carts"`. Affiche une carte par fournisseur actif :
+- Compteur d'items en attente (badge)
+- Indication de mode d'envoi (`"Envoi groupé — lundi 08:00"` si `mail_mode='hebdo'`, rien sinon) — purement informatif, **aucun auto-envoi**
+- Liste des items éditables (libellé + qty, blur = save)
+- Bouton "✕" par item pour retirer
+- "📨 Envoyer le panier" → modal de preview HTML → POST `/supplier-cart/send`
+- "Vider" → delete des items pending pour ce fournisseur
+
+Un badge rouge avec le total d'items pending est affiché sur l'entrée "📦 Paniers" du menu.
+
+### Modal "Préparer commande fournisseur"
+
+Ouvert via le bouton 📦 à côté d'une étape fournisseur **cochée** (comme le bouton ✉️ client). `openSupplierCartModal(order, stepLabel, stepId, progress)`.
+
+Construction des items pré-remplis (`buildInitialSupplierItems`) :
+- Parcours `order.lines_detail` (retourné par `/orders`, contient `display_type` depuis 2026-04-21)
+- `display_type === 'line_section'` → ignoré
+- `display_type === 'line_note'` → concaténé dans le libellé du produit précédent (les produits NOTOX sont souvent génériques, la vraie spec est dans la note qui suit)
+- Produit → item avec `label = product.name`, qty = `product_uom_qty`, `checked: true`
+- Libellé reste éditable dans le modal
+
+Actions :
+- **🧺 Ajouter au panier** : `insert` dans `supplier_cart_items` (`sent_at = NULL`)
+- **📨 Envoyer maintenant** : insert + envoi immédiat via `sendSupplierBatch()` (n'envoie que les items de cette action, pas tout le panier cumulé)
+
+### Helpers supplier
+
+- `supplierNameToKey(name)` : convertit le nom d'affichage STEPS (`"Surf System"`) en slug `fournisseurs.key` (`"surf_system"`). `STEPS` garde les noms d'affichage, **pas modifié**.
+- `sendSupplierBatch(supplier, items)` : applique les placeholders du template (via `window.SUPPLIER_TEMPLATES.applyPlaceholders`), POST `/supplier-cart/send`, puis update `supplier_cart_items.sent_at/batch_id` + insert `supplier_messages_log`. **Atomicité** : si le backend KO → throw (aucune écriture Supabase). Si le mail est parti mais qu'une écriture Supabase échoue → toast WARNING explicite avec le `batch_id` (pas de throw — l'email ne peut pas être rollback). `loadSupplierCart()` est rejoué dans un `finally` pour refresh l'UI dans tous les cas. Retourne `{ out, batchId, warning }` ; les callers n'affichent le toast vert de succès que si `warning === null`.
+- `loadSupplierCart()` : charge tous les items, partitionne en `S.supplierCartItems` (pending) et `S.supplierSentIndex` (Set de `"oid|stepId"` pour marquer le bouton 📦 avec un ✓).
+
+### Tables Supabase touchées
+
+- `fournisseurs` (existante, enrichie : `key`, `cc`, `template_*`, `active`, etc.)
+- `supplier_cart_items` (nouvelle)
+- `supplier_messages_log` (nouvelle)
 
 ---
 
