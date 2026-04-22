@@ -819,12 +819,13 @@ async function syncOdoo() {
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
     S.orders = data.orders || [];
-    // Upsert meta pour nouvelles commandes
+    // Upsert meta pour nouvelles commandes.
+    // On ne seed PAS delivery_type : null = "pas de choix explicite" → déduit
+    // dynamiquement de la présence d'une ligne SHIP (cf. getEffectiveDeliveryType).
     for (const o of S.orders) {
       if (!S.meta[o.id]) {
-        const defaultDelivery = orderHasShipLine(o) ? "livraison" : "retrait";
-        await sb.from("order_meta").upsert({ order_id:o.id, order_name:o.name, delivery_type:defaultDelivery, priority:"normal", emails_sent:{} }, { onConflict:"order_id" });
-        S.meta[o.id] = { delivery_type:defaultDelivery, priority:"normal", archived:false, emails_sent:{} };
+        await sb.from("order_meta").upsert({ order_id:o.id, order_name:o.name, priority:"normal", emails_sent:{} }, { onConflict:"order_id" });
+        S.meta[o.id] = { delivery_type:null, priority:"normal", archived:false, emails_sent:{} };
       }
     }
     // Vérifier archivages et purges automatiques
@@ -1056,13 +1057,23 @@ function fmtAmount(n) { return n ? new Intl.NumberFormat("fr-FR",{style:"currenc
 function buildAddr(p) { if(!p) return ""; return [p.street,p.zip,p.city,p.country_id?.[1]].filter(Boolean).join(", "); }
 
 // true si la commande contient au moins une ligne "SHIP" (produit ou nom),
-// utilisé pour (a) rendre l'étape emballage conditionnelle, (b) initialiser
-// le default de delivery_type sur une nouvelle commande.
+// utilisé pour (a) rendre l'étape emballage conditionnelle, (b) défaut dynamique
+// de delivery_type quand l'utilisateur n'a pas fait de choix explicite.
 function orderHasShipLine(order) {
   return (order?.lines_detail || []).some(l => {
     const label = (l.product_id?.[1] || l.name || "").trim();
     return label === "SHIP";
   });
+}
+
+// delivery_type effectif pour l'UI :
+// - choix explicite de l'utilisateur (meta.delivery_type = "livraison"|"retrait") → respecté
+// - sinon (null/absent) → déduit de la présence d'une ligne SHIP
+function getEffectiveDeliveryType(order, meta) {
+  if (meta?.delivery_type === "livraison" || meta?.delivery_type === "retrait") {
+    return meta.delivery_type;
+  }
+  return orderHasShipLine(order) ? "livraison" : "retrait";
 }
 
 function escapeHtml(s) {
@@ -2107,7 +2118,7 @@ function renderCard(order) {
   const oid   = order.id;
   const prog  = getProgress(oid);
   const isExp = S.expanded.has(oid);
-  const meta  = S.meta[oid] || { delivery_type:"livraison", priority:"normal" };
+  const meta  = S.meta[oid] || { delivery_type:null, priority:"normal" };
   const ship  = order.shipping_detail || order.partner_detail || {};
   const part  = order.partner_detail || {};
   const isUrgent = meta.priority==="urgent";
@@ -2185,7 +2196,7 @@ function renderCard(order) {
 
     let livrHtml = "";
     if (step.isLivraison) {
-      const isRetrait = meta.delivery_type==="retrait";
+      const isRetrait = getEffectiveDeliveryType(order, meta)==="retrait";
       const addr = buildAddr(ship);
       livrHtml=`<div class="livraison-info">
         <div class="livraison-toggle">
