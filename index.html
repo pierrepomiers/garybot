@@ -564,208 +564,6 @@ header {
 .empty-icon { font-size:48px; margin-bottom:12px; }
 .empty-text { font-family:var(--mono); font-size:14px; }
 
-// ═══════════════════════════════════════════════════════════════════
-// EASTER EGG : pull Gary's head pour refresh la page
-// (Contourne le conflit pull-to-refresh iOS standalone)
-// ═══════════════════════════════════════════════════════════════════
-(() => {
-  // Paramètres de feeling
-  const THRESHOLD      = 70;    // px de tirage pour armer
-  const MAX_PULL       = 130;   // plafond
-  const RESISTANCE     = 1.8;   // >1 = plus dur à tirer
-  const STRETCH_FACTOR = 0.35;  // élasticité verticale
-  const SQUEEZE_FACTOR = 0.25;  // amincissement horizontal
-
-  // CSS injecté dynamiquement (pour ne pas alourdir le <style> principal)
-  const style = document.createElement("style");
-  style.textContent = `
-    /* Override : le logo devient interactif pendant le drag */
-    .gary-logo {
-      transform-origin: top left;
-      -webkit-touch-callout: none;
-      -webkit-user-select: none;
-      user-select: none;
-    }
-    .gary-logo.gpull-active {
-      pointer-events: auto !important;
-      touch-action: none;
-      cursor: grab;
-      will-change: transform, filter;
-    }
-    .gary-logo.gpull-armed {
-      filter: drop-shadow(0 6px 20px rgba(96,165,250,0.85))
-              hue-rotate(25deg) brightness(1.2) !important;
-    }
-    .gary-logo.gpull-refreshing {
-      animation: gary-spin 0.6s cubic-bezier(0.4,0,0.2,1) forwards,
-                 gary-flash 0.6s ease-out forwards;
-    }
-    @keyframes gary-spin {
-      0%   { transform: rotate(0deg) scale(1); }
-      50%  { transform: rotate(180deg) scale(1.25); }
-      100% { transform: rotate(360deg) scale(1); }
-    }
-    @keyframes gary-flash {
-      0%   { filter: drop-shadow(0 0 0 rgba(255,255,255,0)) brightness(1); }
-      30%  { filter: drop-shadow(0 0 20px rgba(255,255,255,0.9)) brightness(2); }
-      100% { filter: drop-shadow(0 0 0 rgba(255,255,255,0)) brightness(1); }
-    }
-    #gary-pull-hint {
-      position: fixed;
-      top: 0; left: 50%;
-      transform: translateX(-50%) translateY(-100%);
-      padding: 8px 14px;
-      background: rgba(20,20,20,0.92);
-      color: #e5e7eb;
-      font-family: var(--mono, ui-monospace, monospace);
-      font-size: 12px;
-      border: 1px solid rgba(96,165,250,0.3);
-      border-radius: 0 0 10px 10px;
-      z-index: 9999;
-      opacity: 0;
-      pointer-events: none;
-      transition: transform 180ms ease-out, opacity 180ms ease-out;
-    }
-    #gary-pull-hint.visible {
-      opacity: 1;
-      transform: translateX(-50%) translateY(0);
-    }
-  `;
-  document.head.appendChild(style);
-
-  // Bulle "hint" créée une fois pour toutes
-  const hint = document.createElement("div");
-  hint.id = "gary-pull-hint";
-  hint.textContent = "Tire Gary pour actualiser";
-  document.body.appendChild(hint);
-
-  // Étape clé : rendre le logo interactif dès qu'il est rendu par render()
-  // On utilise un MutationObserver pour gérer le fait que le logo est recréé
-  // à chaque re-render (le header est dans une template string).
-  const observer = new MutationObserver(() => {
-    const logo = document.querySelector(".gary-logo");
-    if (logo && !logo.classList.contains("gpull-active")) {
-      logo.classList.add("gpull-active");
-      attachHandlers(logo);
-    }
-  });
-  observer.observe(document.body, { childList: true, subtree: true });
-
-  // Au cas où le logo soit déjà dans le DOM au chargement initial
-  document.addEventListener("DOMContentLoaded", () => {
-    const logo = document.querySelector(".gary-logo");
-    if (logo) {
-      logo.classList.add("gpull-active");
-      attachHandlers(logo);
-    }
-  });
-
-  function attachHandlers(logo) {
-    let startY = 0;
-    let pulling = false;
-    let armed = false;
-    let refreshing = false;
-
-    function setLogoTransform(pull) {
-      const p = Math.min(pull, MAX_PULL);
-      const progress = p / MAX_PULL;
-      const scaleY = 1 + STRETCH_FACTOR * progress;
-      const scaleX = 1 - SQUEEZE_FACTOR * progress;
-      const tilt = Math.sin(p * 0.08) * 2;
-      logo.style.transform = `translateY(${p}px) scale(${scaleX}, ${scaleY}) rotate(${tilt}deg)`;
-    }
-
-    function onStart(e) {
-      if (refreshing) return;
-      const touch = e.touches ? e.touches[0] : e;
-      startY = touch.clientY;
-      pulling = true;
-      armed = false;
-
-      logo.style.transition = "none";
-      hint.classList.add("visible");
-      hint.textContent = "Tire Gary pour actualiser";
-
-      if (e.cancelable) e.preventDefault();
-    }
-
-    function onMove(e) {
-      if (!pulling || refreshing) return;
-      const touch = e.touches ? e.touches[0] : e;
-      const delta = touch.clientY - startY;
-
-      if (delta <= 0) {
-        setLogoTransform(0);
-        if (armed) {
-          armed = false;
-          logo.classList.remove("gpull-armed");
-        }
-        return;
-      }
-
-      const pull = Math.min(delta / RESISTANCE, MAX_PULL);
-      setLogoTransform(pull);
-
-      const nextArmed = pull >= THRESHOLD;
-      if (nextArmed !== armed) {
-        armed = nextArmed;
-        logo.classList.toggle("gpull-armed", armed);
-        hint.textContent = armed ? "Relâche pour actualiser !" : "Tire Gary pour actualiser";
-        if (armed && navigator.vibrate) navigator.vibrate(10);
-      }
-
-      if (e.cancelable) e.preventDefault();
-    }
-
-    function onEnd() {
-      if (!pulling || refreshing) return;
-      pulling = false;
-      hint.classList.remove("visible");
-
-      if (armed) {
-        trigger();
-      } else {
-        // Snap-back mou
-        logo.style.transition = "transform 280ms cubic-bezier(0.34, 1.56, 0.64, 1)";
-        logo.style.transform = "";
-        logo.classList.remove("gpull-armed");
-      }
-    }
-
-    function trigger() {
-      refreshing = true;
-      logo.classList.remove("gpull-armed");
-
-      // Squash instantané avant la rotation
-      logo.style.transition = "transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1)";
-      logo.style.transform = "translateY(0) scale(1.1, 0.85)";
-
-      if (navigator.vibrate) navigator.vibrate([10, 50, 20]);
-
-      setTimeout(() => {
-        logo.style.transition = "";
-        logo.style.transform = "";
-        logo.classList.add("gpull-refreshing");
-
-        setTimeout(() => {
-          window.location.reload();
-        }, 600);
-      }, 180);
-    }
-
-    // Mouse (pour tests desktop)
-    logo.addEventListener("mousedown", onStart);
-    document.addEventListener("mousemove", onMove);
-    document.addEventListener("mouseup", onEnd);
-
-    // Touch (mobile)
-    logo.addEventListener("touchstart", onStart, { passive: false });
-    document.addEventListener("touchmove", onMove, { passive: false });
-    document.addEventListener("touchend", onEnd, { passive: true });
-    document.addEventListener("touchcancel", onEnd, { passive: true });
-  }
-})();
-  
 </style>
 </head>
 <body>
@@ -2857,6 +2655,211 @@ document.addEventListener("click", (e) => {
 
 async function boot() { initSB(); render(); await checkSession(); render(); }
 boot();
+</script>
+<script>
+  
+// ═══════════════════════════════════════════════════════════════════
+// EASTER EGG : pull Gary's head pour refresh la page
+// (Contourne le conflit pull-to-refresh iOS standalone)
+// ═══════════════════════════════════════════════════════════════════
+(() => {
+  // Paramètres de feeling
+  const THRESHOLD      = 70;    // px de tirage pour armer
+  const MAX_PULL       = 130;   // plafond
+  const RESISTANCE     = 1.8;   // >1 = plus dur à tirer
+  const STRETCH_FACTOR = 0.35;  // élasticité verticale
+  const SQUEEZE_FACTOR = 0.25;  // amincissement horizontal
+
+  // CSS injecté dynamiquement (pour ne pas alourdir le <style> principal)
+  const style = document.createElement("style");
+  style.textContent = `
+    /* Override : le logo devient interactif pendant le drag */
+    .gary-logo {
+      transform-origin: top left;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    .gary-logo.gpull-active {
+      pointer-events: auto !important;
+      touch-action: none;
+      cursor: grab;
+      will-change: transform, filter;
+    }
+    .gary-logo.gpull-armed {
+      filter: drop-shadow(0 6px 20px rgba(96,165,250,0.85))
+              hue-rotate(25deg) brightness(1.2) !important;
+    }
+    .gary-logo.gpull-refreshing {
+      animation: gary-spin 0.6s cubic-bezier(0.4,0,0.2,1) forwards,
+                 gary-flash 0.6s ease-out forwards;
+    }
+    @keyframes gary-spin {
+      0%   { transform: rotate(0deg) scale(1); }
+      50%  { transform: rotate(180deg) scale(1.25); }
+      100% { transform: rotate(360deg) scale(1); }
+    }
+    @keyframes gary-flash {
+      0%   { filter: drop-shadow(0 0 0 rgba(255,255,255,0)) brightness(1); }
+      30%  { filter: drop-shadow(0 0 20px rgba(255,255,255,0.9)) brightness(2); }
+      100% { filter: drop-shadow(0 0 0 rgba(255,255,255,0)) brightness(1); }
+    }
+    #gary-pull-hint {
+      position: fixed;
+      top: 0; left: 50%;
+      transform: translateX(-50%) translateY(-100%);
+      padding: 8px 14px;
+      background: rgba(20,20,20,0.92);
+      color: #e5e7eb;
+      font-family: var(--mono, ui-monospace, monospace);
+      font-size: 12px;
+      border: 1px solid rgba(96,165,250,0.3);
+      border-radius: 0 0 10px 10px;
+      z-index: 9999;
+      opacity: 0;
+      pointer-events: none;
+      transition: transform 180ms ease-out, opacity 180ms ease-out;
+    }
+    #gary-pull-hint.visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+  `;
+  document.head.appendChild(style);
+
+  // Bulle "hint" créée une fois pour toutes
+  const hint = document.createElement("div");
+  hint.id = "gary-pull-hint";
+  hint.textContent = "Tire Gary pour actualiser";
+  document.body.appendChild(hint);
+
+  // Étape clé : rendre le logo interactif dès qu'il est rendu par render()
+  // On utilise un MutationObserver pour gérer le fait que le logo est recréé
+  // à chaque re-render (le header est dans une template string).
+  const observer = new MutationObserver(() => {
+    const logo = document.querySelector(".gary-logo");
+    if (logo && !logo.classList.contains("gpull-active")) {
+      logo.classList.add("gpull-active");
+      attachHandlers(logo);
+    }
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+
+  // Au cas où le logo soit déjà dans le DOM au chargement initial
+  document.addEventListener("DOMContentLoaded", () => {
+    const logo = document.querySelector(".gary-logo");
+    if (logo) {
+      logo.classList.add("gpull-active");
+      attachHandlers(logo);
+    }
+  });
+
+  function attachHandlers(logo) {
+    let startY = 0;
+    let pulling = false;
+    let armed = false;
+    let refreshing = false;
+
+    function setLogoTransform(pull) {
+      const p = Math.min(pull, MAX_PULL);
+      const progress = p / MAX_PULL;
+      const scaleY = 1 + STRETCH_FACTOR * progress;
+      const scaleX = 1 - SQUEEZE_FACTOR * progress;
+      const tilt = Math.sin(p * 0.08) * 2;
+      logo.style.transform = `translateY(${p}px) scale(${scaleX}, ${scaleY}) rotate(${tilt}deg)`;
+    }
+
+    function onStart(e) {
+      if (refreshing) return;
+      const touch = e.touches ? e.touches[0] : e;
+      startY = touch.clientY;
+      pulling = true;
+      armed = false;
+
+      logo.style.transition = "none";
+      hint.classList.add("visible");
+      hint.textContent = "Tire Gary pour actualiser";
+
+      if (e.cancelable) e.preventDefault();
+    }
+
+    function onMove(e) {
+      if (!pulling || refreshing) return;
+      const touch = e.touches ? e.touches[0] : e;
+      const delta = touch.clientY - startY;
+
+      if (delta <= 0) {
+        setLogoTransform(0);
+        if (armed) {
+          armed = false;
+          logo.classList.remove("gpull-armed");
+        }
+        return;
+      }
+
+      const pull = Math.min(delta / RESISTANCE, MAX_PULL);
+      setLogoTransform(pull);
+
+      const nextArmed = pull >= THRESHOLD;
+      if (nextArmed !== armed) {
+        armed = nextArmed;
+        logo.classList.toggle("gpull-armed", armed);
+        hint.textContent = armed ? "Relâche pour actualiser !" : "Tire Gary pour actualiser";
+        if (armed && navigator.vibrate) navigator.vibrate(10);
+      }
+
+      if (e.cancelable) e.preventDefault();
+    }
+
+    function onEnd() {
+      if (!pulling || refreshing) return;
+      pulling = false;
+      hint.classList.remove("visible");
+
+      if (armed) {
+        trigger();
+      } else {
+        // Snap-back mou
+        logo.style.transition = "transform 280ms cubic-bezier(0.34, 1.56, 0.64, 1)";
+        logo.style.transform = "";
+        logo.classList.remove("gpull-armed");
+      }
+    }
+
+    function trigger() {
+      refreshing = true;
+      logo.classList.remove("gpull-armed");
+
+      // Squash instantané avant la rotation
+      logo.style.transition = "transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1)";
+      logo.style.transform = "translateY(0) scale(1.1, 0.85)";
+
+      if (navigator.vibrate) navigator.vibrate([10, 50, 20]);
+
+      setTimeout(() => {
+        logo.style.transition = "";
+        logo.style.transform = "";
+        logo.classList.add("gpull-refreshing");
+
+        setTimeout(() => {
+          window.location.reload();
+        }, 600);
+      }, 180);
+    }
+
+    // Mouse (pour tests desktop)
+    logo.addEventListener("mousedown", onStart);
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onEnd);
+
+    // Touch (mobile)
+    logo.addEventListener("touchstart", onStart, { passive: false });
+    document.addEventListener("touchmove", onMove, { passive: false });
+    document.addEventListener("touchend", onEnd, { passive: true });
+    document.addEventListener("touchcancel", onEnd, { passive: true });
+  }
+})();
+  
 </script>
 </body>
 </html>
