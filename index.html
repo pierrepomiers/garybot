@@ -2171,7 +2171,7 @@ function renderCard(order) {
     }
 
     let deliveryPillHtml = "";
-    if (step.id === "livraison" && !meta.archived && hasShip) {
+    if (step.id === "livraison" && !meta.archived) {
       const clickAt = meta.emails_sent?.livraison_click;
       const dateLabel = isDone && clickAt ? ` · ${fmtShortDate(clickAt)}` : "";
       const doneClass = isDone ? " done" : "";
@@ -2469,14 +2469,10 @@ function bindOrderCards() {
     const currentDone = (S.steps[oid]||{})[stepId]?.done||false;
     // Facturation : uniquement via la pastille "À FACTURER 💰", jamais via la case.
     if (stepId === "facturation") return;
-    // Livraison : pastille "À VALIDER 📦" encore visible (case pas ✅ ET commande avec SHIP) → confirm.
-    // Mini-commande sans SHIP (cash au comptoir) → pas de pastille, pas de confirm, archivage fluide.
-    // Case déjà ✅ → décoche normale (retour en arrière rapide, pas de confirm).
+    // Livraison : pastille "À VALIDER 📦" universelle (passage obligé par Odoo pour clôturer).
+    // Case pas ✅ → confirm. Case déjà ✅ → décoche normale (retour en arrière rapide, pas de confirm).
     if (stepId === "livraison" && !currentDone) {
-      const order = S.orders.find(o => o.id === oid);
-      if (order && orderHasShipLine(order)) {
-        if (!confirm("Tu es sûr ? Tu n'as pas validé la livraison côté Odoo.")) return;
-      }
+      if (!confirm("Tu es sûr ? Tu n'as pas validé la livraison côté Odoo.")) return;
     }
     toggleStep(oid, stepId, currentDone);
   }));

@@ -142,8 +142,8 @@ Philosophie : GaryBot ne lit pas Odoo en temps réel mais **incite** le passage 
 ### Pastille "À VALIDER 📦" (étape `livraison`)
 
 - Même pattern + même URL Odoo, clé timestamp `emails_sent.livraison_click`.
-- **Conditionnée sur SHIP** : rendue uniquement si `orderHasShipLine(order)` (en plus de `!meta.archived`). Mini-commande cash au comptoir (sans SHIP) → aucune pastille.
-- **Case livraison semi-cliquable** : si la commande a SHIP et que la case n'est pas ✅, clic direct sur la case déclenche un `confirm("Tu es sûr ? Tu n'as pas validé la livraison côté Odoo.")`. Case déjà ✅ → décoche sans confirm. Commande sans SHIP → clic direct sans confirm (archivage fluide pour accessoires).
+- **Universelle** : rendue sur toute commande non archivée dont l'étape livraison n'est pas encore validée — passage obligé par Odoo pour clôturer (WH/OUT marqué done côté Odoo = source de vérité), indépendamment de la présence d'une ligne SHIP. L'étape `emballage`, elle, reste conditionnée à SHIP (voir règle plus haut).
+- **Case livraison semi-cliquable** : si la case n'est pas ✅, clic direct déclenche un `confirm("Tu es sûr ? Tu n'as pas validé la livraison côté Odoo.")`. Case déjà ✅ → décoche sans confirm (retour en arrière rapide).
 
 ### Stockage timestamps clic pastille
 
