@@ -11,7 +11,7 @@ Frontend statique de GaryBot, hébergé sur **GitHub Pages**.
 UI mobile-first pour :
 - Login Supabase (email + mot de passe)
 - Board des commandes en cours (sync via backend Render → Odoo XML-RPC)
-- Coches d'étapes par commande (11 étapes : Shape → Déco → … → Livraison)
+- Coches d'étapes par commande (12 étapes : Shape → Déco → … → Emballage → Facturation → Livraison)
 - Envoi de messages clients pré-rédigés + photos via Odoo (chatter archivé)
 - Envoi de mails fournisseurs (Viral, Atua, Ben, FCS, Surf System)
 - Génération de PDF de commande
@@ -105,6 +105,16 @@ Actions :
 - `supplier_messages_log` (nouvelle)
 
 ---
+
+## Étape facturation + pastille "À FACTURER 💰"
+
+L'étape `facturation` (insérée entre `emballage` et `livraison`) est une étape "pure coche" : pas de mail client, pas de fournisseur. Elle sert à tracker que la facture Odoo a bien été émise avant la livraison.
+
+Dans le `contactRow` (ligne ~2093), une pastille rouge pulsante **À FACTURER 💰** s'affiche à côté des chips de contact tant que :
+- la commande n'est pas archivée (`!meta.archived`)
+- ET l'étape `facturation` n'est pas cochée (`!S.steps[oid]?.facturation?.done`)
+
+Le lien pointe sur `${CONFIG.odooWebUrl}/web#id=${oid}&model=sale.order&view_type=form` (ouverture directe de la fiche en mode formulaire, nouvel onglet). CSS : classe `.contact-chip.to-invoice` + keyframes `pulse-invoice` (bloc près de `.contact-chip` ligne ~185).
 
 ## Flow envoi message client
 

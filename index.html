@@ -182,6 +182,16 @@ header {
   .contact-chip.contact-mobile { display:none; }
   .contact-chip.contact-desktop { display:inline-flex; }
 }
+.contact-chip.to-invoice {
+  background:rgba(239,68,68,.18); color:var(--red);
+  border-color:rgba(239,68,68,.45); font-weight:700;
+  animation:pulse-invoice 2.5s ease-in-out infinite;
+}
+.contact-chip.to-invoice:hover { background:rgba(239,68,68,.30); border-color:rgba(239,68,68,.6); color:var(--red); }
+@keyframes pulse-invoice {
+  0%,100% { box-shadow:0 0 0 0 rgba(239,68,68,0); }
+  50%     { box-shadow:0 0 0 4px rgba(239,68,68,.18); }
+}
 
 /* ── STEP ROW ── */
 .step-row { display:flex; flex-direction:column; gap:5px; padding:10px 12px; border-radius:8px; background:rgba(255,255,255,.03); border:1px solid transparent; transition:all .2s; }
@@ -581,6 +591,7 @@ const STEPS = [
   { id:"poncage",      label:"ponçage",       fourn:null, clientMail:true  },
   { id:"finition",     label:"finition",      fourn:null, clientMail:true  },
   { id:"emballage",    label:"emballage",     fourn:null, clientMail:true  },
+  { id:"facturation",  label:"facturation",   fourn:null, clientMail:false },
   { id:"livraison",    label:"livraison",     fourn:null, clientMail:true, isLivraison:true },
 ];
 
@@ -2083,6 +2094,7 @@ function renderCard(order) {
 
   const phone = part.phone || "";
   const email = part.email || "";
+  const needsInvoice = !meta.archived && !S.steps[oid]?.facturation?.done;
   const contactRow = `
     <div class="meta-row">
       <button class="priority-btn ${isUrgent?"urgent":"normal"}" data-priority="${oid}">${isUrgent?"🔴 Urgent":"🟢 Normal"}</button>
@@ -2090,6 +2102,7 @@ function renderCard(order) {
       ${phone ? `<a href="sms:${encodeURI(phone)}" class="contact-chip contact-mobile" title="SMS à ${phone}">💬 SMS</a>` : ""}
       ${phone ? `<span class="contact-chip contact-desktop" title="Numéro client">📞 ${phone}</span>` : ""}
       ${email ? `<a href="mailto:${email}" class="contact-chip" title="Email à ${email}">✉️ Mail</a>` : ""}
+      ${needsInvoice ? `<a href="${CONFIG.odooWebUrl}/web#id=${oid}&model=sale.order&view_type=form" target="_blank" rel="noopener" class="contact-chip to-invoice" title="Ouvrir la commande dans Odoo pour facturer"><strong>À FACTURER 💰</strong></a>` : ""}
     </div>`;
 
   const stepsHtml = STEPS.map(step => {
