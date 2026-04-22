@@ -562,9 +562,10 @@ const CONFIG = {
   odooWebUrl:   "https://notoxsurf.odoo.com",		// URL de base de l'instance Odoo (lien clickable depuis la ref commande)
 };
 
-// Délai avant archivage automatique après livraison cochée (en jours)
-const ARCHIVE_DELAY_DAYS = 15;
-const PURGE_DELAY_DAYS = 30;
+// Délais par défaut (en jours) si app_settings n'est pas disponible.
+// Les valeurs effectives sont chargées depuis Supabase dans S.settings via loadSettings().
+const DEFAULT_ARCHIVE_DELAY_DAYS = 15;
+const DEFAULT_PURGE_DELAY_DAYS = 30;
 
 // ══════════════════════════════════════════════════════════════════════════════
 // ÉTAPES
@@ -603,6 +604,8 @@ let S = {
   // Historique d'envois par (order, step) → Map<supplier_key, { logs, count_total, count_reminders, last_sent_at, first_batch_id, last_subject }>
   // Alimenté depuis supplier_messages_log (seulement les lignes avec order_id + step_id renseignés).
   sendHistoryIndex: new Map(),
+  // Délais (chargés depuis app_settings, fallback sur DEFAULT_*)
+  settings: { archive_delay_days: DEFAULT_ARCHIVE_DELAY_DAYS, purge_delay_days: DEFAULT_PURGE_DELAY_DAYS },
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -650,8 +653,23 @@ async function checkSession() {
 // ══════════════════════════════════════════════════════════════════════════════
 async function loadAll() {
   S.loading = true; render();
+  // Settings chargés en premier : checkAutoArchive/checkAutoPurge (appelés dans syncOdoo) en dépendent.
+  await loadSettings();
   await Promise.all([loadFournisseurs(), loadStepsAndMeta(), syncOdoo(), loadSupplierCart(), loadSupplierSendHistory()]);
   S.loading = false; render();
+}
+
+async function loadSettings() {
+  try {
+    const { data, error } = await sb.from("app_settings").select("*").eq("id", 1).maybeSingle();
+    if (error) { console.warn("loadSettings:", error); return; }
+    if (data) {
+      S.settings.archive_delay_days = data.archive_delay_days ?? S.settings.archive_delay_days;
+      S.settings.purge_delay_days   = data.purge_delay_days   ?? S.settings.purge_delay_days;
+    }
+  } catch (e) {
+    console.warn("loadSettings (exception):", e);
+  }
 }
 
 async function loadFournisseurs() {
@@ -800,7 +818,7 @@ async function syncOdoo() {
 
 // ══════════════════════════════════════════════════════════════════════════════
 // ARCHIVAGE AUTOMATIQUE
-// Déclenché quand livraison est cochée. Archivage effectif après ARCHIVE_DELAY_DAYS.
+// Déclenché quand livraison est cochée. Archivage effectif après S.settings.archive_delay_days jours.
 // ══════════════════════════════════════════════════════════════════════════════
 async function checkAutoArchive() {
   for (const o of S.orders) {
@@ -816,7 +834,7 @@ async function checkAutoArchive() {
 
     const doneAt = new Date(data.done_at);
     const diffDays = (Date.now() - doneAt.getTime()) / (1000 * 60 * 60 * 24);
-    if (diffDays >= ARCHIVE_DELAY_DAYS) {
+    if (diffDays >= S.settings.archive_delay_days) {
       // Archivage automatique
       await archiveOrder(o.id, true);
     } else {
@@ -845,35 +863,39 @@ async function unarchiveOrder(orderId) {
   render();
 }
 
+// Supprime toutes les traces d'une liste de commandes purgées.
+// Ordre : supplier_messages_log → supplier_cart_items → order_steps → order_meta.
+async function deletePurgedOrderData(orderIds) {
+  if (!orderIds.length) return;
+  await sb.from("supplier_messages_log").delete().in("order_id", orderIds);
+  await sb.from("supplier_cart_items").delete().in("order_id", orderIds);
+  await sb.from("order_steps").delete().in("order_id", orderIds);
+  await sb.from("order_meta").delete().in("order_id", orderIds);
+}
+
 async function checkAutoPurge() {
   const toPurge = [];
   for (const [oid, meta] of Object.entries(S.meta)) {
     if (!meta.archived || !meta.archived_at) continue;
     const archivedAt = new Date(meta.archived_at);
     const diffDays = (Date.now() - archivedAt.getTime()) / (1000 * 60 * 60 * 24);
-    if (diffDays >= PURGE_DELAY_DAYS) toPurge.push(parseInt(oid));
+    if (diffDays >= S.settings.purge_delay_days) toPurge.push(parseInt(oid));
   }
   if (!toPurge.length) return;
-  for (const id of toPurge) {
-    await sb.from("order_steps").delete().eq("order_id", id);
-    await sb.from("order_meta").delete().eq("order_id", id);
-    delete S.meta[id];
-    delete S.steps[id];
-  }
+  await deletePurgedOrderData(toPurge);
+  for (const id of toPurge) { delete S.meta[id]; delete S.steps[id]; }
   S.orders = S.orders.filter(o => !toPurge.includes(o.id));
+  await Promise.all([loadSupplierCart(), loadSupplierSendHistory()]);
   console.log(`Auto-purge: ${toPurge.length} commande(s) supprimée(s)`);
 }
 
 async function purgeArchived() {
   const archivedIds = Object.entries(S.meta).filter(([,v]) => v.archived).map(([k]) => parseInt(k));
   if (!archivedIds.length) { showToast("Rien à purger"); return; }
-  for (const id of archivedIds) {
-    await sb.from("order_steps").delete().eq("order_id", id);
-    await sb.from("order_meta").delete().eq("order_id", id);
-  }
-  await loadStepsAndMeta();
+  await deletePurgedOrderData(archivedIds);
+  await Promise.all([loadStepsAndMeta(), loadSupplierCart(), loadSupplierSendHistory()]);
   S.orders = S.orders.filter(o => !archivedIds.includes(o.id));
-  showToast(`🗑 ${archivedIds.length} commande(s) purgée(s)`);
+  showToast(`🗑 ${archivedIds.length} commande(s) purgée(s) (+ panier et historique mails)`);
   render();
 }
 
@@ -2052,7 +2074,7 @@ function renderCard(order) {
 
   const archiveBanner = isPending ? `
     <div class="archive-banner">
-      <span class="archive-banner-text">✅ Livraison cochée — archiver dans ${ARCHIVE_DELAY_DAYS}j ?</span>
+      <span class="archive-banner-text">✅ Livraison cochée — archiver dans ${S.settings.archive_delay_days}j ?</span>
       <div style="display:flex;gap:6px;">
         <button class="archive-confirm-btn" data-archive="${oid}">Archiver</button>
         <button class="archive-cancel-btn" data-unarchive="${oid}">Annuler</button>
@@ -2251,8 +2273,22 @@ function renderSettings() {
       ${foRows || `<div style="color:var(--muted)">Aucun fournisseur. Lance un sync.</div>`}
     </div>
     <div class="settings-section">
-      <div class="section-title">ARCHIVAGE</div>
-      <div class="purge-info">Les commandes sont archivées automatiquement ${ARCHIVE_DELAY_DAYS} jours après la livraison cochée, puis purgées automatiquement ${PURGE_DELAY_DAYS} jours après archivage. La purge les supprime définitivement de GaryBot (elles restent dans Odoo).</div>
+      <div class="section-title">ARCHIVAGE & PURGE</div>
+      <div class="fo-grid">
+        <div>
+          <label class="fo-label">Délai d'archivage (jours)</label>
+          <input class="form-input" id="setting-archive-days" type="number" min="1" max="365" value="${S.settings.archive_delay_days}">
+        </div>
+        <div>
+          <label class="fo-label">Délai de purge (jours, après archivage)</label>
+          <input class="form-input" id="setting-purge-days" type="number" min="1" max="3650" value="${S.settings.purge_delay_days}">
+        </div>
+      </div>
+      <div id="settings-delay-warning" style="display:${S.settings.archive_delay_days > S.settings.purge_delay_days ? "" : "none"};font-size:12px;color:#ff9800;margin-top:6px;">⚠ Délai d'archivage supérieur au délai de purge : configuration inhabituelle.</div>
+      <div style="margin-top:10px; display:flex; gap:8px;">
+        <button class="btn-save" id="save-delays-btn">💾 Enregistrer les délais</button>
+      </div>
+      <div class="purge-info" style="margin-top:14px;">Les commandes sont archivées automatiquement ${S.settings.archive_delay_days} jours après la livraison cochée, puis purgées automatiquement ${S.settings.purge_delay_days} jours après archivage. La purge supprime aussi le panier fournisseur et l'historique mails associés (elles restent dans Odoo).</div>
       ${archivedCount>0
         ? `<div style="font-size:13px;color:var(--muted);margin-bottom:10px;">${archivedCount} commande(s) archivée(s) en attente de purge.</div>
            <button class="btn-danger" id="purge-btn">🗑 Purger les archivées (${archivedCount})</button>`
@@ -2407,7 +2443,42 @@ function bindSettings() {
   bindNav();
   document.getElementById("logout-btn")?.addEventListener("click", logout);
   document.getElementById("purge-btn")?.addEventListener("click", async()=>{
-    if(confirm("Supprimer définitivement toutes les commandes archivées de GaryBot ?")) await purgeArchived();
+    if(confirm("Supprimer définitivement toutes les commandes archivées de GaryBot (ainsi que leur panier et historique mails) ?")) await purgeArchived();
+  });
+
+  // Délais d'archivage / purge
+  const archInput = document.getElementById("setting-archive-days");
+  const purgeInput = document.getElementById("setting-purge-days");
+  const warnEl = document.getElementById("settings-delay-warning");
+  const refreshWarn = () => {
+    if (!archInput || !purgeInput || !warnEl) return;
+    const a = parseInt(archInput.value) || 0;
+    const p = parseInt(purgeInput.value) || 0;
+    warnEl.style.display = (a > p) ? "" : "none";
+  };
+  archInput?.addEventListener("input", refreshWarn);
+  purgeInput?.addEventListener("input", refreshWarn);
+
+  document.getElementById("save-delays-btn")?.addEventListener("click", async () => {
+    const a = parseInt(archInput?.value);
+    const p = parseInt(purgeInput?.value);
+    if (!Number.isFinite(a) || a < 1 || a > 365)  { showToast("⚠ Délai d'archivage invalide (1-365 jours)"); return; }
+    if (!Number.isFinite(p) || p < 1 || p > 3650) { showToast("⚠ Délai de purge invalide (1-3650 jours)"); return; }
+    const btn = document.getElementById("save-delays-btn");
+    btn.disabled = true; const prev = btn.textContent; btn.textContent = "…";
+    const { error } = await sb.from("app_settings").upsert(
+      { id:1, archive_delay_days:a, purge_delay_days:p, updated_at: new Date().toISOString() },
+      { onConflict: "id" }
+    );
+    btn.disabled = false; btn.textContent = prev;
+    if (error) { console.error(error); showToast("⚠ Sauvegarde échouée : " + error.message); return; }
+    S.settings.archive_delay_days = a;
+    S.settings.purge_delay_days   = p;
+    showToast("✓ Délais enregistrés");
+    // Application immédiate : on relance archivage + purge auto.
+    await checkAutoArchive();
+    await checkAutoPurge();
+    render();
   });
   document.querySelectorAll("[data-settings-unarchive]").forEach(btn=>btn.addEventListener("click", async()=>{
     const oid = parseInt(btn.dataset.settingsUnarchive);
