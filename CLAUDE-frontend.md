@@ -11,7 +11,7 @@ Frontend statique de GaryBot, hébergé sur **GitHub Pages**.
 UI mobile-first pour :
 - Login Supabase (email + mot de passe)
 - Board des commandes en cours (sync via backend Render → Odoo XML-RPC)
-- Coches d'étapes par commande (12 étapes : Shape → Déco → … → Emballage → Facturation → Livraison)
+- Coches d'étapes par commande (13 étapes max : Shape → Déco → … → Finition → Post-cuisson → Facturation → Emballage → Livraison ; emballage rendu seulement si ligne SHIP présente, sinon 12 étapes)
 - Envoi de messages clients pré-rédigés + photos via Odoo (chatter archivé)
 - Envoi de mails fournisseurs (Viral, Atua, Ben, FCS, Surf System)
 - Génération de PDF de commande
@@ -106,15 +106,48 @@ Actions :
 
 ---
 
-## Étape facturation + pastille "À FACTURER 💰"
+## Structure STEPS (depuis 2026-04-22, "intégration Odoo douce")
 
-L'étape `facturation` (insérée entre `emballage` et `livraison`) est une étape "pure coche" : pas de mail client, pas de fournisseur. Elle sert à tracker que la facture Odoo a bien été émise avant la livraison.
+Ordre final des 13 étapes dans `const STEPS` (`index.html:583`) :
 
-Dans le `contactRow` (ligne ~2093), une pastille rouge pulsante **À FACTURER 💰** s'affiche à côté des chips de contact tant que :
-- la commande n'est pas archivée (`!meta.archived`)
-- ET l'étape `facturation` n'est pas cochée (`!S.steps[oid]?.facturation?.done`)
+1. `appro_blank` – Appro. Blank (fournisseur)
+2. `cmd_preshape` – Cmd. Preshape (fournisseur)
+3. `cmd_access` – Cmd. Access. (fournisseur)
+4. `shape` – shape (client mail)
+5. `deco` – déco (client mail)
+6. `strat` – stratification (client mail)
+7. `pose_plugs` – pose Plugs
+8. `poncage` – ponçage (client mail)
+9. `finition` – finition (client mail)
+10. `post_cuisson` – post-cuisson (pure coche)
+11. `facturation` – facturation (pure coche, voir pastille ci-dessous)
+12. `emballage` – emballage (client mail, **conditionnel SHIP** — voir règle ci-dessous)
+13. `livraison` – livraison (client mail, pastille "À VALIDER 📦", `isLivraison:true`)
 
-Le lien pointe sur `${CONFIG.odooWebUrl}/web#id=${oid}&model=sale.order&view_type=form` (ouverture directe de la fiche en mode formulaire, nouvel onglet). CSS : classe `.contact-chip.to-invoice` + keyframes `pulse-invoice` (bloc près de `.contact-chip` ligne ~185).
+### Règle SHIP (ligne `orderHasShipLine` dans `index.html`)
+
+`emballage` n'est rendu **ni dans le board ni dans le dénominateur de `getProgress`** que si `order.lines_detail` contient au moins une ligne dont le libellé produit ou nom est exactement `"SHIP"` (trimmed). Sinon `getProgress` utilise 12 étapes comme dénominateur, pas 13. Même helper utilisé pour **initialiser le default de `delivery_type`** à la première sync d'une commande : SHIP → `"livraison"`, sinon `"retrait"` (le toggle manuel 🚚/📍 reste fonctionnel et prioritaire ensuite).
+
+## Pastilles Odoo "douces" — facturation & livraison
+
+Philosophie : GaryBot ne lit pas Odoo en temps réel mais **incite** le passage par Odoo avant de cocher ces deux étapes, sans bloquer le flow.
+
+### Pastille "À FACTURER 💰" (étape `facturation`)
+
+- Toujours rendue tant que `!meta.archived`. Lien : `${CONFIG.odooWebUrl}/web#id=${oid}&model=sale.order&view_type=form` (nouvel onglet).
+- **Case facturation non cliquable manuellement** (handler `.step-check` early-return sur `stepId === "facturation"`). Seul le clic pastille coche.
+- Au clic sur la pastille : ouvre Odoo + `toggleStep(oid, "facturation", false)` + `recordOdooPastilleClick(order, "facturation_click")`.
+- Deux états CSS (`.mail-btn.to-invoice` / `.mail-btn.to-invoice.done`) : rouge pulsant avant coche, gris neutre avec date `· JJ/MM` après (timestamp lu dans `meta.emails_sent.facturation_click`). Reste cliquable à l'état grisé pour rouvrir Odoo sans re-cocher.
+
+### Pastille "À VALIDER 📦" (étape `livraison`)
+
+- Même pattern + même URL Odoo, clé timestamp `emails_sent.livraison_click`.
+- **Conditionnée sur SHIP** : rendue uniquement si `orderHasShipLine(order)` (en plus de `!meta.archived`). Mini-commande cash au comptoir (sans SHIP) → aucune pastille.
+- **Case livraison semi-cliquable** : si la commande a SHIP et que la case n'est pas ✅, clic direct sur la case déclenche un `confirm("Tu es sûr ? Tu n'as pas validé la livraison côté Odoo.")`. Case déjà ✅ → décoche sans confirm. Commande sans SHIP → clic direct sans confirm (archivage fluide pour accessoires).
+
+### Stockage timestamps clic pastille
+
+Clés **distinctes** dans le JSON `order_meta.emails_sent` : `facturation_click` et `livraison_click`. Ne PAS confondre avec les clés `facturation` / `livraison` qui traceraient un envoi mail client réel via `recordClientEmailSent` (`facturation` n'a de toute façon pas `clientMail:true`). Helper dédié : `recordOdooPastilleClick(order, key)` — **sémantique "date de validation initiale"** : seul le premier clic fixe la date, les clics suivants ré-ouvrent Odoo mais n'écrasent pas le timestamp.
 
 ## Flow envoi message client
 

@@ -188,6 +188,14 @@ header {
   animation:pulse-invoice 2.5s ease-in-out infinite;
 }
 .mail-btn.to-invoice:hover { background:rgba(239,68,68,.30); border-color:rgba(239,68,68,.6); color:var(--red); }
+.mail-btn.to-invoice.done {
+  background:rgba(148,163,184,.10); color:#94a3b8;
+  border-color:rgba(148,163,184,.35); font-weight:600;
+  animation:none; opacity:.55;
+}
+.mail-btn.to-invoice.done:hover {
+  background:rgba(148,163,184,.18); border-color:rgba(148,163,184,.5); color:#cbd5e1; opacity:.8;
+}
 @keyframes pulse-invoice {
   0%,100% { box-shadow:0 0 0 0 rgba(239,68,68,0); }
   50%     { box-shadow:0 0 0 4px rgba(239,68,68,.18); }
@@ -590,8 +598,9 @@ const STEPS = [
   { id:"pose_plugs",   label:"pose Plugs",    fourn:null, clientMail:false },
   { id:"poncage",      label:"ponçage",       fourn:null, clientMail:true  },
   { id:"finition",     label:"finition",      fourn:null, clientMail:true  },
-  { id:"emballage",    label:"emballage",     fourn:null, clientMail:true  },
+  { id:"post_cuisson", label:"post-cuisson",  fourn:null, clientMail:false },
   { id:"facturation",  label:"facturation",   fourn:null, clientMail:false },
+  { id:"emballage",    label:"emballage",     fourn:null, clientMail:true  },
   { id:"livraison",    label:"livraison",     fourn:null, clientMail:true, isLivraison:true },
 ];
 
@@ -813,8 +822,9 @@ async function syncOdoo() {
     // Upsert meta pour nouvelles commandes
     for (const o of S.orders) {
       if (!S.meta[o.id]) {
-        await sb.from("order_meta").upsert({ order_id:o.id, order_name:o.name, delivery_type:"livraison", priority:"normal", emails_sent:{} }, { onConflict:"order_id" });
-        S.meta[o.id] = { delivery_type:"livraison", priority:"normal", archived:false, emails_sent:{} };
+        const defaultDelivery = orderHasShipLine(o) ? "livraison" : "retrait";
+        await sb.from("order_meta").upsert({ order_id:o.id, order_name:o.name, delivery_type:defaultDelivery, priority:"normal", emails_sent:{} }, { onConflict:"order_id" });
+        S.meta[o.id] = { delivery_type:defaultDelivery, priority:"normal", archived:false, emails_sent:{} };
       }
     }
     // Vérifier archivages et purges automatiques
@@ -975,6 +985,20 @@ async function recordClientEmailSent(order, stepId) {
   } catch(e) { console.warn("emails_sent upsert:", e); }
 }
 
+// Trace le clic sur une pastille Odoo (facturation_click / livraison_click).
+// Clés distinctes des stepId réels pour ne pas interférer avec les envois mail client.
+// Sémantique "date de validation initiale" : seul le PREMIER clic fixe la date,
+// les clics suivants ré-ouvrent Odoo mais n'écrasent pas le timestamp.
+async function recordOdooPastilleClick(order, key) {
+  const prev = S.meta[order.id]?.emails_sent || {};
+  if (prev[key]) return;
+  const emails_sent = { ...prev, [key]:new Date().toISOString() };
+  S.meta[order.id] = { ...(S.meta[order.id]||{}), emails_sent };
+  try {
+    await sb.from("order_meta").upsert({ order_id:order.id, order_name:order.name||"", emails_sent }, { onConflict:"order_id" });
+  } catch(e) { console.warn("emails_sent (pastille) upsert:", e); }
+}
+
 async function downloadOrderPdf(orderId, orderName, btn) {
   const label = orderName || orderId;
   if (btn) { btn.disabled = true; btn.textContent = "⏳"; }
@@ -1012,7 +1036,10 @@ async function logHistory(orderId, orderName, stepId, action, value, userEmail) 
 // ══════════════════════════════════════════════════════════════════════════════
 function getProgress(orderId) {
   const steps = S.steps[orderId] || {};
-  return Math.round(STEPS.filter(s => steps[s.id]?.done).length / STEPS.length * 100);
+  const order = S.orders.find(o => o.id === orderId);
+  const hasShip = order ? orderHasShipLine(order) : true;
+  const applicable = STEPS.filter(s => s.id !== "emballage" || hasShip);
+  return Math.round(applicable.filter(s => steps[s.id]?.done).length / applicable.length * 100);
 }
 function pClass(p) { return p===100?"p100":p>=61?"p75":p>=31?"p50":"p25"; }
 function pColor(p) { return p===100?"#4ade80":p>=61?"#fbbf24":p>=31?"#fb923c":"#f87171"; }
@@ -1027,6 +1054,16 @@ function fmtDateTime(s) {
 }
 function fmtAmount(n) { return n ? new Intl.NumberFormat("fr-FR",{style:"currency",currency:"EUR",maximumFractionDigits:0}).format(n) : ""; }
 function buildAddr(p) { if(!p) return ""; return [p.street,p.zip,p.city,p.country_id?.[1]].filter(Boolean).join(", "); }
+
+// true si la commande contient au moins une ligne "SHIP" (produit ou nom),
+// utilisé pour (a) rendre l'étape emballage conditionnelle, (b) initialiser
+// le default de delivery_type sur une nouvelle commande.
+function orderHasShipLine(order) {
+  return (order?.lines_detail || []).some(l => {
+    const label = (l.product_id?.[1] || l.name || "").trim();
+    return label === "SHIP";
+  });
+}
 
 function escapeHtml(s) {
   return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
@@ -2103,7 +2140,9 @@ function renderCard(order) {
       ${email ? `<a href="mailto:${email}" class="contact-chip" title="Email à ${email}">✉️ Mail</a>` : ""}
     </div>`;
 
-  const stepsHtml = STEPS.map(step => {
+  const hasShip = orderHasShipLine(order);
+  const odooOrderUrl = `${CONFIG.odooWebUrl}/web#id=${oid}&model=sale.order&view_type=form`;
+  const stepsHtml = STEPS.filter(step => step.id !== "emballage" || hasShip).map(step => {
     const check  = (S.steps[oid]||{})[step.id]||{};
     const isDone = !!check.done;
 
@@ -2113,8 +2152,19 @@ function renderCard(order) {
     }
 
     let invoiceHtml = "";
-    if (step.id === "facturation" && !isDone && !meta.archived) {
-      invoiceHtml = `<a href="${CONFIG.odooWebUrl}/web#id=${oid}&model=sale.order&view_type=form" target="_blank" rel="noopener" class="mail-btn to-invoice" title="Ouvrir la commande dans Odoo pour facturer"><strong>À FACTURER 💰</strong></a>`;
+    if (step.id === "facturation" && !meta.archived) {
+      const clickAt = meta.emails_sent?.facturation_click;
+      const dateLabel = isDone && clickAt ? ` · ${fmtShortDate(clickAt)}` : "";
+      const doneClass = isDone ? " done" : "";
+      invoiceHtml = `<a href="${odooOrderUrl}" target="_blank" rel="noopener" class="mail-btn to-invoice${doneClass}" data-invoice-oid="${oid}" title="Ouvrir la commande dans Odoo pour facturer"><strong>À FACTURER 💰${dateLabel}</strong></a>`;
+    }
+
+    let deliveryPillHtml = "";
+    if (step.id === "livraison" && !meta.archived && hasShip) {
+      const clickAt = meta.emails_sent?.livraison_click;
+      const dateLabel = isDone && clickAt ? ` · ${fmtShortDate(clickAt)}` : "";
+      const doneClass = isDone ? " done" : "";
+      deliveryPillHtml = `<a href="${odooOrderUrl}" target="_blank" rel="noopener" class="mail-btn to-invoice${doneClass}" data-delivery-oid="${oid}" title="Ouvrir la commande dans Odoo pour valider la livraison"><strong>À VALIDER 📦${dateLabel}</strong></a>`;
     }
 
     let supplierBtnHtml = "";
@@ -2154,7 +2204,7 @@ function renderCard(order) {
       <div class="step-row-top">
         <button class="step-check" data-oid="${oid}" data-step="${step.id}">${isDone?"✅":"☑️"}</button>
         <span class="step-label">${step.label}</span>
-        ${supplierBtnHtml}${reminderBtnsHtml}${clientHtml}${invoiceHtml}
+        ${supplierBtnHtml}${reminderBtnsHtml}${clientHtml}${invoiceHtml}${deliveryPillHtml}
       </div>
       ${livrHtml}
     </div>`;
@@ -2405,7 +2455,19 @@ function bindOrderCards() {
   document.querySelectorAll(".step-check").forEach(btn=>btn.addEventListener("click", e=>{
     e.stopPropagation();
     const oid=parseInt(btn.dataset.oid), stepId=btn.dataset.step;
-    toggleStep(oid, stepId, (S.steps[oid]||{})[stepId]?.done||false);
+    const currentDone = (S.steps[oid]||{})[stepId]?.done||false;
+    // Facturation : uniquement via la pastille "À FACTURER 💰", jamais via la case.
+    if (stepId === "facturation") return;
+    // Livraison : pastille "À VALIDER 📦" encore visible (case pas ✅ ET commande avec SHIP) → confirm.
+    // Mini-commande sans SHIP (cash au comptoir) → pas de pastille, pas de confirm, archivage fluide.
+    // Case déjà ✅ → décoche normale (retour en arrière rapide, pas de confirm).
+    if (stepId === "livraison" && !currentDone) {
+      const order = S.orders.find(o => o.id === oid);
+      if (order && orderHasShipLine(order)) {
+        if (!confirm("Tu es sûr ? Tu n'as pas validé la livraison côté Odoo.")) return;
+      }
+    }
+    toggleStep(oid, stepId, currentDone);
   }));
   document.querySelectorAll("[data-type]").forEach(btn=>btn.addEventListener("click", e=>{
     e.stopPropagation(); setDeliveryType(parseInt(btn.dataset.oid), btn.dataset.type);
@@ -2452,6 +2514,27 @@ function bindOrderCards() {
     const supplierKey = btn.dataset.reminderSupplier;
     const order = S.orders.find(o => o.id === oid);
     if (order && supplierKey) openReminderModal(order, stepId, supplierKey);
+  }));
+  // Pastille "À FACTURER 💰" : <a target="_blank"> ouvre Odoo nativement.
+  // Le handler coche la case facturation (si pas encore ✅) et trace le clic.
+  document.querySelectorAll("[data-invoice-oid]").forEach(el=>el.addEventListener("click", e=>{
+    e.stopPropagation();
+    const oid = parseInt(el.dataset.invoiceOid);
+    const order = S.orders.find(o => o.id === oid);
+    if (!order) return;
+    recordOdooPastilleClick(order, "facturation_click");
+    const isDone = !!(S.steps[oid]||{}).facturation?.done;
+    if (!isDone) toggleStep(oid, "facturation", false);
+  }));
+  // Pastille "À VALIDER 📦" : même pattern pour l'étape livraison.
+  document.querySelectorAll("[data-delivery-oid]").forEach(el=>el.addEventListener("click", e=>{
+    e.stopPropagation();
+    const oid = parseInt(el.dataset.deliveryOid);
+    const order = S.orders.find(o => o.id === oid);
+    if (!order) return;
+    recordOdooPastilleClick(order, "livraison_click");
+    const isDone = !!(S.steps[oid]||{}).livraison?.done;
+    if (!isDone) toggleStep(oid, "livraison", false);
   }));
 }
 
