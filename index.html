@@ -433,6 +433,43 @@ header {
   display:flex; align-items:center; justify-content:space-between; gap:10px;
   margin-bottom:6px;
 }
+.fourn-row.extended .fo-group-head {
+  cursor: pointer;
+  user-select: none;
+  transition: background .15s;
+}
+.fourn-row.extended .fo-group-head:hover {
+  background: rgba(255,255,255,.02);
+  border-radius: 6px;
+}
+.fourn-row.extended .fo-chevron {
+  color: var(--muted);
+  font-size: 12px;
+  transition: transform .2s ease;
+  margin-right: 8px;
+  display: inline-block;
+}
+.fourn-row.extended:not(.collapsed) .fo-chevron {
+  transform: rotate(0deg);
+}
+.fourn-row.extended.collapsed .fo-chevron {
+  transform: rotate(-90deg);
+}
+.fourn-row.extended .fo-collapsible-content {
+  overflow: hidden;
+  transition: max-height .25s ease, opacity .2s ease, margin-top .2s ease;
+}
+.fourn-row.extended.collapsed .fo-collapsible-content {
+  max-height: 0;
+  opacity: 0;
+  margin-top: 0;
+  pointer-events: none;
+}
+.fourn-row.extended:not(.collapsed) .fo-collapsible-content {
+  max-height: 2000px;
+  opacity: 1;
+  margin-top: 8px;
+}
 
 /* ── SUPPLIER CARTS VIEW ── */
 #supplier-carts-screen { flex:1; padding:14px 12px 28px; max-width:900px; margin:0 auto; width:100%; }
@@ -654,6 +691,7 @@ let S = {
   supplierCartItems: [],     // items en attente (sent_at NULL) de tous les fournisseurs
   supplierSentIndex: new Set(), // "oid|stepId" pour lesquels au moins un envoi a déjà été fait
   expandedPreviews: new Set(),  // supplier_keys dont l'aperçu mail est déroulé (vue Paniers)
+  expandedSupplierKeys: new Set(), // keys des fournisseurs dont la carte Réglages est dépliée
   // Historique d'envois par (order, step) → Map<supplier_key, { logs, count_total, count_reminders, last_sent_at, first_batch_id, last_subject }>
   // Alimenté depuis supplier_messages_log (seulement les lignes avec order_id + step_id renseignés).
   sendHistoryIndex: new Map(),
@@ -2397,12 +2435,14 @@ function renderSettings() {
     const heure = (s.mail_heure || "08:00:00").slice(0,5);
     const daysOpts = [1,2,3,4,5,6,7].map(d =>
       `<option value="${d}" ${jour===d?"selected":""}>${WEEKDAYS_FR[d]}</option>`).join("");
+    const isExpanded = S.expandedSupplierKeys.has(k);
     return `
-    <div class="fourn-row extended" data-fo-key="${k}">
+    <div class="fourn-row extended ${isExpanded?"":"collapsed"}" data-fo-key="${k}">
       <div class="fo-group-head">
-        <span class="fourn-name">${escapeHtml(s.name)}</span>
+        <span class="fourn-name"><span class="fo-chevron">▾</span>${escapeHtml(s.name)}</span>
         <label class="fo-inline-row" style="gap:6px;"><input type="checkbox" data-fo-field="active" ${s.active!==false?"checked":""}> actif</label>
       </div>
+      <div class="fo-collapsible-content">
       <div class="fo-grid">
         <div>
           <label class="fo-label">Email</label>
@@ -2458,6 +2498,7 @@ function renderSettings() {
       </div>
       <div style="display:flex; gap:8px; margin-top:10px;">
         <button class="btn-save" data-save-supplier="${k}">💾 Enregistrer ${escapeHtml(s.name)}</button>
+      </div>
       </div>
     </div>`;
   }).join("");
@@ -2856,6 +2897,19 @@ function bindSettings() {
     showToast("↩ Commande désarchivée");
     render();
   }));
+
+  // Toggle dépliage des cartes fournisseurs au clic sur le header
+  document.querySelectorAll(".fourn-row.extended .fo-group-head").forEach(head => {
+    head.addEventListener("click", e => {
+      if (e.target.closest("label")) return;
+      const row = head.closest("[data-fo-key]");
+      if (!row) return;
+      const key = row.dataset.foKey;
+      if (S.expandedSupplierKeys.has(key)) S.expandedSupplierKeys.delete(key);
+      else S.expandedSupplierKeys.add(key);
+      row.classList.toggle("collapsed");
+    });
+  });
 
   // Masquer/afficher les champs hebdo selon mail_mode
   document.querySelectorAll('[data-fo-field="mail_mode"]').forEach(sel => sel.addEventListener("change", e => {
