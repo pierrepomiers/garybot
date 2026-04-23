@@ -490,6 +490,37 @@ header {
 .btn-clear-cart {
   background:rgba(239,68,68,.08); color:var(--red); border-color:rgba(239,68,68,.25); flex:0 0 auto;
 }
+.supplier-cart-empty-hint {
+  color:var(--muted); font-size:12px; font-style:italic;
+  padding:10px 8px 6px; font-family:var(--mono); letter-spacing:.02em;
+}
+.supplier-cart-manual-add {
+  padding:8px 8px 12px;
+}
+.supplier-cart-manual-add .btn-add-manual {
+  background:transparent; border:1px dashed var(--border); color:var(--muted);
+  padding:10px 12px; border-radius:8px; font-family:var(--mono); font-size:13px;
+  width:100%; min-height:40px; cursor:pointer;
+  transition:border-color .15s, color .15s;
+}
+.supplier-cart-manual-add .btn-add-manual:hover { border-color:var(--accent); color:var(--accent); }
+.supplier-preview-toggle {
+  display:flex; align-items:center; justify-content:space-between;
+  width:100%; min-height:40px; padding:10px 14px;
+  background:rgba(255,255,255,.02); border:none; border-top:1px solid var(--border);
+  color:var(--muted); font-family:var(--mono); font-size:12px; letter-spacing:.04em;
+  cursor:pointer; transition:color .15s, background .15s;
+}
+.supplier-preview-toggle:hover { color:var(--text); background:rgba(255,255,255,.04); }
+.supplier-preview-toggle .spt-chevron { font-size:11px; }
+.supplier-preview-panel {
+  padding:12px; border-top:1px solid var(--border); background:rgba(255,255,255,.01);
+}
+.supplier-preview-panel .preview-subject {
+  font-family:var(--mono); font-size:12px; color:var(--muted);
+  margin-bottom:8px; word-break:break-word;
+}
+.supplier-preview-panel .preview-subject strong { color:var(--text); }
 
 /* ── SUPPLIER CART MODAL ── */
 .supplier-line-row {
@@ -622,6 +653,7 @@ let S = {
   suppliersByKey: {},        // { 'viral': { key, name, email, cc, template_*, mail_mode, ... } }
   supplierCartItems: [],     // items en attente (sent_at NULL) de tous les fournisseurs
   supplierSentIndex: new Set(), // "oid|stepId" pour lesquels au moins un envoi a déjà été fait
+  expandedPreviews: new Set(),  // supplier_keys dont l'aperçu mail est déroulé (vue Paniers)
   // Historique d'envois par (order, step) → Map<supplier_key, { logs, count_total, count_reminders, last_sent_at, first_batch_id, last_subject }>
   // Alimenté depuis supplier_messages_log (seulement les lignes avec order_id + step_id renseignés).
   sendHistoryIndex: new Map(),
@@ -1650,6 +1682,42 @@ async function sendSupplierBatch(supplier, itemsToSend, opts = {}) {
 }
 
 // ── Vue "Paniers fournisseurs" ─────────────────────────────────────────────
+function renderSupplierMailPreview(supplier, items) {
+  const ctx = { date: window.SUPPLIER_TEMPLATES.formatDate(), supplier_name: supplier.name };
+  const subject = window.SUPPLIER_TEMPLATES.applyPlaceholders(supplier.template_subject || window.SUPPLIER_TEMPLATES.defaultSubject, ctx);
+  const header  = window.SUPPLIER_TEMPLATES.applyPlaceholders(supplier.template_header  || window.SUPPLIER_TEMPLATES.defaultHeader,  ctx);
+  const footer  = window.SUPPLIER_TEMPLATES.applyPlaceholders(supplier.template_footer  || window.SUPPLIER_TEMPLATES.defaultFooter,  ctx);
+
+  const rowsHtml = items.length === 0
+    ? `<tr><td colspan="3" style="border:1px solid #ccc;padding:12px;text-align:center;color:#888;font-style:italic;">Aucun article</td></tr>`
+    : items.map(it => {
+        const qtyS = (Number(it.qty)||0).toString().replace(/\.0+$/, "");
+        return `<tr>
+          <td style="border:1px solid #ccc;padding:8px;">${escapeHtml(it.product_label||"")}</td>
+          <td style="border:1px solid #ccc;padding:8px;text-align:right;">${qtyS}</td>
+          <td style="border:1px solid #ccc;padding:8px;">${it.order_ref ? escapeHtml(it.order_ref) : "—"}</td>
+        </tr>`;
+      }).join("");
+
+  const previewHtml = `
+    <div style="font-family:Arial, sans-serif; color:#222; font-size:14px; line-height:1.5;">
+      <p>${escapeHtml(header).replace(/\n/g,"<br>")}</p>
+      <table style="border-collapse:collapse; width:100%; margin:16px 0;">
+        <thead><tr style="background:#f0f0f0;">
+          <th style="border:1px solid #ccc; padding:8px; text-align:left;">Article</th>
+          <th style="border:1px solid #ccc; padding:8px; text-align:right;">Qté</th>
+          <th style="border:1px solid #ccc; padding:8px; text-align:left;">Réf commande</th>
+        </tr></thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+      <p>${escapeHtml(footer).replace(/\n/g,"<br>")}</p>
+    </div>`;
+
+  return `
+    <div class="preview-subject"><strong>Sujet :</strong> ${escapeHtml(subject)}</div>
+    <div class="preview-box">${previewHtml}</div>`;
+}
+
 function renderSupplierCarts() {
   const keys = Object.keys(S.suppliersByKey).filter(k => S.suppliersByKey[k].active !== false);
   // Tri : non vides d'abord
@@ -1669,7 +1737,7 @@ function renderSupplierCarts() {
       : "";
 
     const itemsHtml = count === 0
-      ? `<div style="color:var(--muted); font-size:13px; padding:14px 8px;">Aucun article en attente.</div>`
+      ? `<div class="supplier-cart-empty-hint">Panier vide — ajoute un article manuel ci-dessous.</div>`
       : items.map(it => `
           <div class="supplier-card-item" data-id="${it.id}">
             <input class="sci-label" data-id="${it.id}" type="text" value="${escapeHtml(it.product_label||"")}">
@@ -1678,6 +1746,14 @@ function renderSupplierCarts() {
             <button class="sci-del" data-del="${it.id}" type="button" title="Retirer">×</button>
           </div>
         `).join("");
+
+    const manualAddHtml = `
+      <div class="supplier-cart-manual-add">
+        <button type="button" class="btn-add-manual" data-add-manual="${k}">+ Ajouter un article manuel</button>
+      </div>`;
+
+    const previewOpen = S.expandedPreviews.has(k);
+    const previewPanelHtml = previewOpen ? renderSupplierMailPreview(sup, items) : "";
 
     const missingEmail = !sup.email;
     return `
@@ -1690,7 +1766,15 @@ function renderSupplierCarts() {
           </div>
           <span class="sc-count${count===0?" zero":""}">${count} article${count>1?"s":""}</span>
         </div>
-        <div class="supplier-card-body">${itemsHtml}</div>
+        <div class="supplier-card-body">
+          ${itemsHtml}
+          ${manualAddHtml}
+        </div>
+        <button type="button" class="supplier-preview-toggle" data-toggle-preview="${k}" aria-expanded="${previewOpen?"true":"false"}">
+          <span>Aperçu du mail</span>
+          <span class="spt-chevron" aria-hidden="true">${previewOpen?"▲":"▼"}</span>
+        </button>
+        ${previewOpen ? `<div class="supplier-preview-panel">${previewPanelHtml}</div>` : ""}
         <div class="supplier-card-footer">
           <button class="btn-send-cart" data-send-cart="${k}" ${count===0||missingEmail?"disabled":""}>📨 Envoyer le panier</button>
           <button class="btn-clear-cart" data-clear-cart="${k}" ${count===0?"disabled":""}>Vider</button>
@@ -1747,6 +1831,41 @@ function bindSupplierCarts() {
     const items = pendingItemsForSupplier(key);
     if (items.length === 0) return;
     openSupplierSendPreview(supplier, items);
+  }));
+
+  document.querySelectorAll("[data-toggle-preview]").forEach(btn => btn.addEventListener("click", () => {
+    const key = btn.dataset.togglePreview;
+    if (S.expandedPreviews.has(key)) S.expandedPreviews.delete(key);
+    else S.expandedPreviews.add(key);
+    render();
+  }));
+
+  document.querySelectorAll("[data-add-manual]").forEach(btn => btn.addEventListener("click", async () => {
+    const key = btn.dataset.addManual;
+    btn.disabled = true;
+    const row = {
+      supplier_key: key,
+      order_id: null,
+      order_ref: null,
+      step_id: null,
+      product_label: "",
+      qty: 1,
+      source: "manual",
+      notes: null,
+      added_by: S.user?.email || null,
+      sent_at: null,
+    };
+    const { data, error } = await sb.from("supplier_cart_items").insert(row).select().single();
+    if (error) {
+      console.warn("add manual item:", error);
+      showToast("⚠ Ajout impossible : " + (error.message || "erreur Supabase"));
+      btn.disabled = false;
+      return;
+    }
+    S.supplierCartItems.push(data);
+    render();
+    const newLabel = document.querySelector(`.sci-label[data-id="${data.id}"]`);
+    if (newLabel) { newLabel.focus(); newLabel.select(); }
   }));
 }
 
