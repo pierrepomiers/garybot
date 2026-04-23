@@ -126,7 +126,11 @@ Ordre final des 13 étapes dans `const STEPS` (`index.html:583`) :
 
 ### Règle SHIP (ligne `orderHasShipLine` dans `index.html`)
 
-`emballage` n'est rendu **ni dans le board ni dans le dénominateur de `getProgress`** que si `order.lines_detail` contient au moins une ligne dont le libellé produit ou nom est exactement `"SHIP"` (trimmed). Sinon `getProgress` utilise 12 étapes comme dénominateur, pas 13. Même helper utilisé pour **initialiser le default de `delivery_type`** à la première sync d'une commande : SHIP → `"livraison"`, sinon `"retrait"` (le toggle manuel 🚚/📍 reste fonctionnel et prioritaire ensuite).
+`emballage` n'est rendu **ni dans le board ni dans le dénominateur de `getProgress`** que si `order.lines_detail` contient au moins une ligne dont le libellé produit ou nom est exactement `"SHIP"` (trimmed). Même helper utilisé pour **initialiser le default de `delivery_type`** à la première sync d'une commande : SHIP → `"livraison"`, sinon `"retrait"` (le toggle manuel 🚚/📍 reste fonctionnel et prioritaire ensuite).
+
+### Règle progression (depuis 2026-04-23)
+
+`getProgress` n'inclut **que les étapes de production** : `appro_blank` → `post_cuisson` (10 étapes) + `emballage` si SHIP. Les étapes administratives `facturation` et `livraison` sont **exclues du calcul** du pourcentage — elles continuent de se cocher normalement (et déclenchent leurs pastilles À FACTURER 💰 / À VALIDER 📦 + l'archivage auto pour livraison), mais n'impactent plus la barre de progression. Dénominateur effectif : **11 étapes** avec SHIP, **10 sans**. Conséquence : une commande atteint 100% dès `post_cuisson` cochée (+ `emballage` si SHIP). Le filtre board correspondant s'appelle **"Finies"** (ex-"Livrées") pour coller à cette sémantique "fini côté prod". La stat-chip "livrées" de la barre de stats compte le nombre de commandes archivées, indépendamment de la progression.
 
 ## Pastilles Odoo "douces" — facturation & livraison
 

@@ -1110,7 +1110,13 @@ function getProgress(orderId) {
   const steps = S.steps[orderId] || {};
   const order = S.orders.find(o => o.id === orderId);
   const hasShip = order ? orderHasShipLine(order) : true;
-  const applicable = STEPS.filter(s => s.id !== "emballage" || hasShip);
+  // Seules les étapes de production comptent dans la progression.
+  // facturation et livraison sont traçables via leurs pastilles À FACTURER 💰 et À VALIDER 📦,
+  // mais n'affectent plus le pourcentage : la commande est "finie côté prod" dès post_cuisson.
+  const NON_PROGRESS_STEPS = new Set(["facturation", "livraison"]);
+  const applicable = STEPS.filter(s =>
+    !NON_PROGRESS_STEPS.has(s.id) && (s.id !== "emballage" || hasShip)
+  );
   return Math.round(applicable.filter(s => steps[s.id]?.done).length / applicable.length * 100);
 }
 function pClass(p) { return p===100?"p100":p>=61?"p75":p>=31?"p50":"p25"; }
@@ -2249,7 +2255,7 @@ function renderOrders() {
     <select class="filter-select" id="filter-select">
       <option value="all"     ${S.filter==="all"    ?"selected":""}>Toutes</option>
       <option value="pending" ${S.filter==="pending"?"selected":""}>En cours</option>
-      <option value="done"    ${S.filter==="done"   ?"selected":""}>Livrées</option>
+      <option value="done"    ${S.filter==="done"   ?"selected":""}>Finies</option>
       <option value="urgent"  ${S.filter==="urgent" ?"selected":""}>Urgentes</option>
     </select>
   </div>
