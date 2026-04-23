@@ -1798,6 +1798,7 @@ function bindSupplierCarts() {
     const { error } = await sb.from("supplier_cart_items").update({ product_label: val }).eq("id", id);
     if (error) { console.warn(error); showToast("⚠ Maj label échouée"); return; }
     const row = S.supplierCartItems.find(r => r.id === id); if (row) row.product_label = val;
+    if (row && S.expandedPreviews.has(row.supplier_key)) render();
   }));
   document.querySelectorAll(".sci-qty").forEach(inp => {
     inp.addEventListener("blur", async e => {
@@ -1806,6 +1807,7 @@ function bindSupplierCarts() {
       const { error } = await sb.from("supplier_cart_items").update({ qty }).eq("id", id);
       if (error) { console.warn(error); showToast("⚠ Maj qty échouée"); return; }
       const row = S.supplierCartItems.find(r => r.id === id); if (row) row.qty = qty;
+      if (row && S.expandedPreviews.has(row.supplier_key)) render();
     });
     bindQtyArrowKeys(inp);
   });
