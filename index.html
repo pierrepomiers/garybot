@@ -2115,9 +2115,9 @@ async function openReminderModal(order, stepId, supplierKey) {
   setTimeout(() => subjectEl?.focus(), 50);
 }
 
-function showToast(msg) {
+function showToast(msg, duration = 2700) {
   const t = document.createElement("div"); t.className="toast"; t.textContent=msg;
-  document.body.appendChild(t); setTimeout(()=>t.remove(), 2700);
+  document.body.appendChild(t); setTimeout(()=>t.remove(), duration);
 }
 
 function filteredOrders() {
@@ -2469,6 +2469,7 @@ function renderSettings() {
       <div style="font-size:12px; color:var(--muted); margin-bottom:14px; font-family:var(--mono);">
         Placeholders : <code>{date}</code>, <code>{supplier_name}</code>, <code>{order_ref}</code>, <code>{step_label}</code>.
       </div>
+      <button class="btn-save" id="add-supplier-btn" style="margin-top:0;margin-bottom:14px;">➕ Ajouter un fournisseur</button>
       ${foRows || `<div style="color:var(--muted)">Aucun fournisseur. Lance un sync.</div>`}
     </div>
     <div class="settings-section">
@@ -2667,9 +2668,150 @@ function bindOrderCards() {
   }));
 }
 
+// Modal de création d'un nouveau fournisseur.
+// Scope volontairement limité : crée uniquement la fiche. L'association
+// fournisseur ↔ étapes reste hardcodée dans STEPS (voir toast post-création).
+function openNewSupplierModal() {
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal-card" role="dialog" aria-modal="true">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span class="modal-title-icon" aria-hidden="true">➕</span>
+          <span class="modal-title-text">
+            <span>Nouveau fournisseur</span>
+            <small>La liste des étapes autorisées reste gérée dans STEPS (code)</small>
+          </span>
+        </div>
+        <button class="modal-close" data-close aria-label="Fermer">×</button>
+      </div>
+      <div class="modal-body">
+        <div>
+          <label class="field-label" for="ns-name">Nom *</label>
+          <input id="ns-name" class="field-input" type="text" placeholder="Hexa Covers" autocomplete="off" required>
+        </div>
+        <div>
+          <label class="field-label" for="ns-email">Email *</label>
+          <input id="ns-email" class="field-input" type="email" placeholder="contact@example.com" autocomplete="off" required>
+        </div>
+        <div>
+          <label class="field-label" for="ns-cc">Cc (optionnel)</label>
+          <input id="ns-cc" class="field-input" type="text" placeholder="cc1@example.com, cc2@example.com" autocomplete="off">
+        </div>
+        <div>
+          <label class="field-label" for="ns-contact">Contact (optionnel)</label>
+          <input id="ns-contact" class="field-input" type="text" autocomplete="off">
+        </div>
+        <div>
+          <label class="field-label" for="ns-phone">Téléphone (optionnel)</label>
+          <input id="ns-phone" class="field-input" type="text" autocomplete="off">
+        </div>
+        <div>
+          <label class="field-label" for="ns-notes">Notes internes (optionnel)</label>
+          <textarea id="ns-notes" class="field-textarea" style="min-height:80px;"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-modal-cancel" data-close>Annuler</button>
+        <button class="btn-modal-send" id="ns-create">Créer</button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(overlay);
+  document.body.style.overflow = "hidden";
+  document.body.style.position = "fixed";
+  document.body.style.width = "100%";
+
+  const nameEl    = overlay.querySelector("#ns-name");
+  const emailEl   = overlay.querySelector("#ns-email");
+  const ccEl      = overlay.querySelector("#ns-cc");
+  const contactEl = overlay.querySelector("#ns-contact");
+  const phoneEl   = overlay.querySelector("#ns-phone");
+  const notesEl   = overlay.querySelector("#ns-notes");
+  const createBtn = overlay.querySelector("#ns-create");
+
+  function close() {
+    document.body.style.overflow = "";
+    document.body.style.position = "";
+    document.body.style.width = "";
+    overlay.remove();
+    document.removeEventListener("keydown", onKey);
+  }
+  function onKey(e) { if (e.key === "Escape") close(); }
+  document.addEventListener("keydown", onKey);
+
+  overlay.querySelectorAll("[data-close]").forEach(b => b.addEventListener("click", close));
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
+
+  setTimeout(() => nameEl.focus(), 50);
+
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  createBtn.addEventListener("click", async () => {
+    const nameVal    = (nameEl.value || "").trim();
+    const emailVal   = (emailEl.value || "").trim();
+    const ccArr      = (ccEl.value || "").split(",").map(s => s.trim()).filter(Boolean);
+    const contactVal = (contactEl.value || "").trim();
+    const phoneVal   = (phoneEl.value || "").trim();
+    const notesVal   = notesEl.value || "";
+
+    if (!nameVal)  { showToast("⚠ Nom requis"); nameEl.focus(); return; }
+    if (!emailVal || !EMAIL_RE.test(emailVal)) { showToast("⚠ Email invalide"); emailEl.focus(); return; }
+
+    const key = supplierNameToKey(nameVal);
+    if (!key) { showToast("⚠ Nom invalide"); nameEl.focus(); return; }
+    if (S.suppliersByKey[key]) {
+      showToast("⚠ Un fournisseur avec ce nom existe déjà");
+      nameEl.focus();
+      return;
+    }
+
+    const payload = {
+      name: nameVal,
+      key,
+      email: emailVal,
+      cc: ccArr,
+      contact_nom: contactVal,
+      phone: phoneVal,
+      notes: notesVal,
+      delai_livraison_jours: 7,
+      mail_mode: "instantané",
+      mail_jour: 1,
+      mail_heure: "08:00:00",
+      template_subject: window.SUPPLIER_TEMPLATES?.defaultSubject || "Commande NOTOX — {date}",
+      template_header:  window.SUPPLIER_TEMPLATES?.defaultHeader  || "Bonjour,\n\nVoici notre commande :",
+      template_footer:  window.SUPPLIER_TEMPLATES?.defaultFooter  || "Merci,\nNOTOX",
+      active: true,
+      updated_at: new Date().toISOString(),
+    };
+
+    createBtn.disabled = true;
+    const prevHtml = createBtn.innerHTML;
+    createBtn.innerHTML = `<span class="spinner-xs"></span> Création…`;
+    try {
+      const { error } = await sb.from("fournisseurs").insert(payload);
+      if (error) throw error;
+      close();
+      await loadFournisseurs();
+      render();
+      showToast(`✓ Fournisseur ${nameVal} créé`);
+      setTimeout(() => {
+        showToast(`⚠ Pour que ${nameVal} apparaisse comme option dans une étape, il faut encore modifier STEPS dans index.html`, 5000);
+      }, 2800);
+    } catch (err) {
+      console.error(err);
+      showToast("⚠ Création échouée : " + (err.message || err));
+      createBtn.disabled = false;
+      createBtn.innerHTML = prevHtml;
+    }
+  });
+}
+
 function bindSettings() {
   bindNav();
   document.getElementById("logout-btn")?.addEventListener("click", logout);
+  document.getElementById("add-supplier-btn")?.addEventListener("click", openNewSupplierModal);
   document.getElementById("purge-btn")?.addEventListener("click", async()=>{
     if(confirm("Supprimer définitivement toutes les commandes archivées de GaryBot (ainsi que leur panier et historique mails) ?")) await purgeArchived();
   });
