@@ -1672,6 +1672,13 @@ function openSupplierCartModal(order, stepLabel, stepId, progress) {
     // Un seul batch_group_id pour toute l'insertion : ces items partagent la même note
     // et seront rendus dans un seul bloc côté mail.
     const batchGroupId = crypto.randomUUID();
+    // Règle spéciale Ben : préfixer la note par le nom du client pour qu'il identifie
+    // le destinataire final sur les blanks/preshapes. Silent fallback si pas de nom.
+    const clientName = (order.partner_detail?.name || "").trim();
+    let finalNotes = notes || null;
+    if (key === "ben" && clientName) {
+      finalNotes = notes ? `${clientName}\n${notes}` : clientName;
+    }
     const rows = picked.map(l => ({
       supplier_key: key,
       order_id: order.id,
@@ -1680,7 +1687,7 @@ function openSupplierCartModal(order, stepLabel, stepId, progress) {
       product_label: l.label.trim(),
       qty: Number(l.qty) || 1,
       source: l.source,
-      notes: notes || null,
+      notes: finalNotes,
       batch_group_id: batchGroupId,
       added_by: S.user?.email || null,
     }));
