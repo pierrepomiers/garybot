@@ -1552,6 +1552,9 @@ function openSupplierCartModal(order, stepLabel, stepId, progress) {
   }
 
   async function insertIntoCart(key, picked, notes) {
+    // Un seul batch_group_id pour toute l'insertion : ces items partagent la même note
+    // et seront rendus dans un seul bloc côté mail.
+    const batchGroupId = crypto.randomUUID();
     const rows = picked.map(l => ({
       supplier_key: key,
       order_id: order.id,
@@ -1561,6 +1564,7 @@ function openSupplierCartModal(order, stepLabel, stepId, progress) {
       qty: Number(l.qty) || 1,
       source: l.source,
       notes: notes || null,
+      batch_group_id: batchGroupId,
       added_by: S.user?.email || null,
     }));
     const { data, error } = await sb.from("supplier_cart_items").insert(rows).select();
@@ -1592,18 +1596,14 @@ function openSupplierCartModal(order, stepLabel, stepId, progress) {
     if (!supplier || !supplier.email) { showToast("⚠ Email fournisseur manquant — renseigne-le dans Réglages"); return; }
     btnSend.disabled = true; btnSend.innerHTML = `<span class="spinner-xs"></span> Envoi…`;
     try {
+      // On envoie uniquement les items de CETTE insertion (et pas tout le panier cumulé).
+      // inserted contient les rows DB complètes (batch_group_id, notes, added_at) —
+      // sendSupplierBatch les groupe et construit les blocs.
       const inserted = await insertIntoCart(sel.key, sel.picked, sel.notes);
-      // On envoie uniquement les items de CETTE insertion (et pas tout le panier cumulé)
-      const itemsToSend = inserted.map(r => ({
-        id: r.id,
-        product_label: r.product_label,
-        qty: Number(r.qty) || 1,
-        order_ref: r.order_ref || null,
-      }));
-      const result = await sendSupplierBatch(supplier, itemsToSend, { orderId: order.id, stepId });
+      const result = await sendSupplierBatch(supplier, inserted, { orderId: order.id, stepId });
       close();
       if (!result.warning) {
-        showToast(`✓ Envoyé à ${supplier.name} — ${itemsToSend.length} article${itemsToSend.length>1?"s":""}`);
+        showToast(`✓ Envoyé à ${supplier.name} — ${inserted.length} article${inserted.length>1?"s":""}`);
       }
       render();
     } catch (err) {
@@ -1614,10 +1614,55 @@ function openSupplierCartModal(order, stepLabel, stepId, progress) {
   });
 }
 
+// Groupe les items par batch_group_id pour produire des blocs {note, items}.
+// Ordre : groupes triés par added_at du 1er item de chaque groupe (ascendant).
+// Fallback legacy : si aucun item n'a de batch_group_id (relance d'ancien batch),
+// on rend UN seul bloc sans note.
+function groupItemsByBatch(items) {
+  const hasAnyGroup = items.some(it => it && it.batch_group_id);
+  if (!hasAnyGroup) {
+    return [{ note: null, items }];
+  }
+  const byGroup = new Map();
+  const orderedGroups = [];
+  for (const it of items) {
+    const gid = it.batch_group_id || it.id;
+    if (!byGroup.has(gid)) {
+      byGroup.set(gid, {
+        note: it.notes || null,
+        items: [],
+        firstAddedAt: it.added_at || "",
+      });
+      orderedGroups.push(gid);
+    }
+    byGroup.get(gid).items.push(it);
+  }
+  orderedGroups.sort((a, b) => {
+    const ta = byGroup.get(a).firstAddedAt || "";
+    const tb = byGroup.get(b).firstAddedAt || "";
+    return ta.localeCompare(tb);
+  });
+  return orderedGroups.map(gid => ({
+    note: byGroup.get(gid).note,
+    items: byGroup.get(gid).items,
+  }));
+}
+
+// Simplifie un item complet en payload minimal pour le backend.
+function itemToPayload(it) {
+  return {
+    id: it.id,
+    product_label: it.product_label,
+    qty: Number(it.qty) || 1,
+    order_ref: it.order_ref || null,
+  };
+}
+
 // Envoie un batch au backend /supplier-cart/send puis met à jour Supabase.
-// itemsToSend : [{ id, product_label, qty, order_ref }] — pour un envoi initial, les IDs
-//   doivent être valides dans supplier_cart_items ; pour une relance, les IDs sont juste
-//   passés au backend (pas d'update cart_items).
+// itemsToSend : items complets issus de supplier_cart_items (DB rows) — doivent
+//   contenir au minimum id, product_label, qty, order_ref, plus batch_group_id,
+//   notes, added_at pour que le groupement par bloc fonctionne. Pour une relance
+//   (origin items sans batch_group_id), fallback 1 bloc unique.
 // opts : {
 //   orderId, stepId        — si fournis, écrits dans supplier_messages_log (utile à la relance)
 //   isReminder             — true → skip update cart_items, insert log avec is_reminder=true
@@ -1651,13 +1696,19 @@ async function sendSupplierBatch(supplier, itemsToSend, opts = {}) {
     : window.SUPPLIER_TEMPLATES.applyPlaceholders(supplier.template_header  || window.SUPPLIER_TEMPLATES.defaultHeader,  ctx);
   const footer  = window.SUPPLIER_TEMPLATES.applyPlaceholders(supplier.template_footer  || window.SUPPLIER_TEMPLATES.defaultFooter,  ctx);
 
+  const groupedBlocks = groupItemsByBatch(itemsToSend);
+  const blocks = groupedBlocks.map(block => ({
+    note: block.note,
+    items: block.items.map(itemToPayload),
+  }));
+
   const payload = {
     supplier_key:  supplier.key,
     supplier_name: supplier.name,
     supplier_email: supplier.email,
     cc: supplier.cc || [],
     subject, header, footer,
-    items: itemsToSend,
+    blocks,
     sent_by: S.user?.email || null,
   };
 
@@ -1727,36 +1778,66 @@ async function sendSupplierBatch(supplier, itemsToSend, opts = {}) {
 }
 
 // ── Vue "Paniers fournisseurs" ─────────────────────────────────────────────
+// Rendu d'un bloc (table + note optionnelle) pour la preview HTML.
+function renderPreviewBlockHtml(block) {
+  const rowsHtml = block.items.map(it => {
+    const qtyS = (Number(it.qty)||0).toString().replace(/\.0+$/, "");
+    return `<tr>
+      <td style="border:1px solid #ccc;padding:8px;">${escapeHtml(it.product_label||"")}</td>
+      <td style="border:1px solid #ccc;padding:8px;text-align:right;">${qtyS}</td>
+      <td style="border:1px solid #ccc;padding:8px;">${it.order_ref ? escapeHtml(it.order_ref) : "—"}</td>
+    </tr>`;
+  }).join("");
+
+  const tableHtml = `
+    <table style="border-collapse:collapse; width:100%; margin:8px 0;">
+      <thead><tr style="background:#f0f0f0;">
+        <th style="border:1px solid #ccc; padding:8px; text-align:left;">Article</th>
+        <th style="border:1px solid #ccc; padding:8px; text-align:right;">Qté</th>
+        <th style="border:1px solid #ccc; padding:8px; text-align:left;">Réf commande</th>
+      </tr></thead>
+      <tbody>${rowsHtml}</tbody>
+    </table>`;
+
+  const noteHtml = block.note
+    ? `<p style="margin:4px 0 16px; font-style:italic; color:#555;"><strong>Note :</strong> ${escapeHtml(block.note)}</p>`
+    : "";
+  return tableHtml + noteHtml;
+}
+
+// Rendu du corps HTML d'un mail fournisseur (header + N blocs séparés + footer).
+function renderSupplierMailBodyHtml(header, footer, blocks) {
+  const blocksHtml = blocks.length === 0
+    ? `<table style="border-collapse:collapse; width:100%; margin:8px 0;">
+         <thead><tr style="background:#f0f0f0;">
+           <th style="border:1px solid #ccc; padding:8px; text-align:left;">Article</th>
+           <th style="border:1px solid #ccc; padding:8px; text-align:right;">Qté</th>
+           <th style="border:1px solid #ccc; padding:8px; text-align:left;">Réf commande</th>
+         </tr></thead>
+         <tbody><tr><td colspan="3" style="border:1px solid #ccc;padding:12px;text-align:center;color:#888;font-style:italic;">Aucun article</td></tr></tbody>
+       </table>`
+    : blocks
+        .map((b, i) => (i > 0 ? '<hr style="border:0; border-top:1px dashed #ccc; margin:20px 0;">' : "") + renderPreviewBlockHtml(b))
+        .join("");
+
+  return `
+    <div style="font-family:Arial, sans-serif; color:#222; font-size:14px; line-height:1.5;">
+      <p>${escapeHtml(header).replace(/\n/g,"<br>")}</p>
+      ${blocksHtml}
+      <p>${escapeHtml(footer).replace(/\n/g,"<br>")}</p>
+    </div>`;
+}
+
 function renderSupplierMailPreview(supplier, items) {
   const ctx = { date: window.SUPPLIER_TEMPLATES.formatDate(), supplier_name: supplier.name };
   const subject = window.SUPPLIER_TEMPLATES.applyPlaceholders(supplier.template_subject || window.SUPPLIER_TEMPLATES.defaultSubject, ctx);
   const header  = window.SUPPLIER_TEMPLATES.applyPlaceholders(supplier.template_header  || window.SUPPLIER_TEMPLATES.defaultHeader,  ctx);
   const footer  = window.SUPPLIER_TEMPLATES.applyPlaceholders(supplier.template_footer  || window.SUPPLIER_TEMPLATES.defaultFooter,  ctx);
 
-  const rowsHtml = items.length === 0
-    ? `<tr><td colspan="3" style="border:1px solid #ccc;padding:12px;text-align:center;color:#888;font-style:italic;">Aucun article</td></tr>`
-    : items.map(it => {
-        const qtyS = (Number(it.qty)||0).toString().replace(/\.0+$/, "");
-        return `<tr>
-          <td style="border:1px solid #ccc;padding:8px;">${escapeHtml(it.product_label||"")}</td>
-          <td style="border:1px solid #ccc;padding:8px;text-align:right;">${qtyS}</td>
-          <td style="border:1px solid #ccc;padding:8px;">${it.order_ref ? escapeHtml(it.order_ref) : "—"}</td>
-        </tr>`;
-      }).join("");
-
-  const previewHtml = `
-    <div style="font-family:Arial, sans-serif; color:#222; font-size:14px; line-height:1.5;">
-      <p>${escapeHtml(header).replace(/\n/g,"<br>")}</p>
-      <table style="border-collapse:collapse; width:100%; margin:16px 0;">
-        <thead><tr style="background:#f0f0f0;">
-          <th style="border:1px solid #ccc; padding:8px; text-align:left;">Article</th>
-          <th style="border:1px solid #ccc; padding:8px; text-align:right;">Qté</th>
-          <th style="border:1px solid #ccc; padding:8px; text-align:left;">Réf commande</th>
-        </tr></thead>
-        <tbody>${rowsHtml}</tbody>
-      </table>
-      <p>${escapeHtml(footer).replace(/\n/g,"<br>")}</p>
-    </div>`;
+  const blocks = groupItemsByBatch(items);
+  // Fallback vide : si panier vide, groupItemsByBatch renvoie [{note:null, items:[]}] — on force [] pour l'état vide.
+  const blocksForRender = items.length === 0 ? [] : blocks;
+  const previewHtml = renderSupplierMailBodyHtml(header, footer, blocksForRender);
 
   return `
     <div class="preview-subject"><strong>Sujet :</strong> ${escapeHtml(subject)}</div>
@@ -1899,6 +1980,8 @@ function bindSupplierCarts() {
       qty: 1,
       source: "manual",
       notes: null,
+      // Ajout manuel isolé : chaque item a son propre groupe (= 1 bloc par item manuel côté mail)
+      batch_group_id: crypto.randomUUID(),
       added_by: S.user?.email || null,
       sent_at: null,
     };
@@ -1922,27 +2005,8 @@ function openSupplierSendPreview(supplier, items) {
   const header  = window.SUPPLIER_TEMPLATES.applyPlaceholders(supplier.template_header  || window.SUPPLIER_TEMPLATES.defaultHeader,  ctx);
   const footer  = window.SUPPLIER_TEMPLATES.applyPlaceholders(supplier.template_footer  || window.SUPPLIER_TEMPLATES.defaultFooter,  ctx);
 
-  const rowsHtml = items.map(it => {
-    const qtyS = (Number(it.qty)||0).toString().replace(/\.0+$/, "");
-    return `<tr>
-      <td style="border:1px solid #ccc;padding:8px;">${escapeHtml(it.product_label||"")}</td>
-      <td style="border:1px solid #ccc;padding:8px;text-align:right;">${qtyS}</td>
-      <td style="border:1px solid #ccc;padding:8px;">${escapeHtml(it.order_ref||"")}</td>
-    </tr>`;
-  }).join("");
-  const previewHtml = `
-    <div style="font-family:Arial, sans-serif; color:#222; font-size:14px; line-height:1.5;">
-      <p>${escapeHtml(header).replace(/\n/g,"<br>")}</p>
-      <table style="border-collapse:collapse; width:100%; margin:16px 0;">
-        <thead><tr style="background:#f0f0f0;">
-          <th style="border:1px solid #ccc; padding:8px; text-align:left;">Article</th>
-          <th style="border:1px solid #ccc; padding:8px; text-align:right;">Qté</th>
-          <th style="border:1px solid #ccc; padding:8px; text-align:left;">Réf commande</th>
-        </tr></thead>
-        <tbody>${rowsHtml}</tbody>
-      </table>
-      <p>${escapeHtml(footer).replace(/\n/g,"<br>")}</p>
-    </div>`;
+  const blocks = groupItemsByBatch(items);
+  const previewHtml = renderSupplierMailBodyHtml(header, footer, blocks);
 
   const overlay = document.createElement("div");
   overlay.className = "modal-overlay";
@@ -1992,9 +2056,8 @@ function openSupplierSendPreview(supplier, items) {
     const btn = overlay.querySelector("#confirm-send");
     btn.disabled = true; btn.innerHTML = `<span class="spinner-xs"></span> Envoi…`;
     try {
-      const toSend = items.map(it => ({
-        id: it.id, product_label: it.product_label, qty: Number(it.qty)||1, order_ref: it.order_ref || null,
-      }));
+      // items sont les rows complètes de supplier_cart_items (batch_group_id, notes, added_at inclus).
+      // sendSupplierBatch les groupe par batch_group_id → N blocs.
       // Si tous les items partagent la même (order_id, step_id), on les passe
       // à sendSupplierBatch pour que la relance future soit possible. Sinon (envoi
       // multi-commandes depuis la vue Paniers), on les laisse null.
@@ -2002,10 +2065,10 @@ function openSupplierSendPreview(supplier, items) {
       const sids = new Set(items.map(it => it.step_id));
       const unifiedOrderId = oids.size === 1 ? [...oids][0] : null;
       const unifiedStepId  = sids.size === 1 ? [...sids][0] : null;
-      const result = await sendSupplierBatch(supplier, toSend, { orderId: unifiedOrderId, stepId: unifiedStepId });
+      const result = await sendSupplierBatch(supplier, items, { orderId: unifiedOrderId, stepId: unifiedStepId });
       close();
       if (!result.warning) {
-        showToast(`✓ Envoyé à ${supplier.name} — ${toSend.length} article${toSend.length>1?"s":""}`);
+        showToast(`✓ Envoyé à ${supplier.name} — ${items.length} article${items.length>1?"s":""}`);
       }
       render();
     } catch (err) {
