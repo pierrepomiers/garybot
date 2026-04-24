@@ -1224,10 +1224,18 @@ function getProgress(orderId) {
   // facturation et livraison sont traçables via leurs pastilles À FACTURER 💰 et À VALIDER 📦,
   // mais n'affectent plus le pourcentage : la commande est "finie côté prod" dès post_cuisson.
   const NON_PROGRESS_STEPS = new Set(["facturation", "livraison"]);
+  const EMBALLAGE_WEIGHT = 0.5;
   const applicable = STEPS.filter(s =>
     !NON_PROGRESS_STEPS.has(s.id) && (s.id !== "emballage" || hasShip)
   );
-  return Math.round(applicable.filter(s => steps[s.id]?.done).length / applicable.length * 100);
+  let totalWeight = 0;
+  let doneWeight = 0;
+  for (const s of applicable) {
+    const weight = (s.id === "emballage") ? EMBALLAGE_WEIGHT : 1;
+    totalWeight += weight;
+    if (steps[s.id]?.done) doneWeight += weight;
+  }
+  return totalWeight > 0 ? Math.round((doneWeight / totalWeight) * 100) : 0;
 }
 function pClass(p) { return p===100?"p100":p>=61?"p75":p>=31?"p50":"p25"; }
 function pColor(p) { return p===100?"#4ade80":p>=61?"#fbbf24":p>=31?"#fb923c":"#f87171"; }
