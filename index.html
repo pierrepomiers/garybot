@@ -614,6 +614,9 @@ header {
   max-height:280px; overflow:auto; border:1px solid var(--border);
   border-radius:8px; padding:12px; background:#fff; color:#222;
 }
+/* Header/footer éditables dans la modal d'envoi fournisseur :
+   textareas courts (rows="4-5") au lieu du min-height:180px global. */
+.modal-body .field-textarea.ssp-edit-area { min-height:0; }
 .reminder-preview-table {
   width:100%; border-collapse:collapse; font-family:var(--mono); font-size:12px;
   background:var(--bg3); border-radius:8px; overflow:hidden;
@@ -1465,7 +1468,7 @@ function openSupplierCartModal(order, stepLabel, stepId, progress) {
       <div class="modal-footer">
         <button class="btn-modal-cancel" data-close>Annuler</button>
         <button class="btn-modal-cart-add" id="sc-btn-add">🧺 Ajouter au panier</button>
-        <button class="btn-modal-send" id="sc-btn-send">📨 Envoyer maintenant</button>
+        <button class="btn-modal-send" id="sc-btn-send">📨 Envoyer (avec aperçu)</button>
       </div>
     </div>`;
 
@@ -1594,22 +1597,19 @@ function openSupplierCartModal(order, stepLabel, stepId, progress) {
     const sel = collectSelection(); if (!sel) return;
     const supplier = S.suppliersByKey[sel.key];
     if (!supplier || !supplier.email) { showToast("⚠ Email fournisseur manquant — renseigne-le dans Réglages"); return; }
-    btnSend.disabled = true; btnSend.innerHTML = `<span class="spinner-xs"></span> Envoi…`;
+    btnSend.disabled = true; btnSend.innerHTML = `<span class="spinner-xs"></span> Insertion…`;
     try {
-      // On envoie uniquement les items de CETTE insertion (et pas tout le panier cumulé).
-      // inserted contient les rows DB complètes (batch_group_id, notes, added_at) —
-      // sendSupplierBatch les groupe et construit les blocs.
+      // Flux A unifié : on insère les items puis on ouvre la modal d'envoi (éditable).
+      // L'envoi effectif passe par openSupplierSendPreview → sendSupplierBatch avec
+      // subject/header/footer overrides issus des textareas. Pas d'envoi direct.
       const inserted = await insertIntoCart(sel.key, sel.picked, sel.notes);
-      const result = await sendSupplierBatch(supplier, inserted, { orderId: order.id, stepId });
       close();
-      if (!result.warning) {
-        showToast(`✓ Envoyé à ${supplier.name} — ${inserted.length} article${inserted.length>1?"s":""}`);
-      }
       render();
+      openSupplierSendPreview(supplier, inserted);
     } catch (err) {
       console.error(err);
-      btnSend.disabled = false; btnSend.innerHTML = "📨 Envoyer maintenant";
-      showToast("⚠ Échec envoi mail : " + (err.message || err));
+      btnSend.disabled = false; btnSend.innerHTML = "📨 Envoyer (avec aperçu)";
+      showToast("⚠ Erreur : " + (err.message || err));
     }
   });
 }
@@ -1669,6 +1669,7 @@ function itemToPayload(it) {
 //   parentBatchId          — id du batch d'origine (requis si isReminder=true)
 //   subjectOverride        — sujet à envoyer au backend (relance : "RELANCE — …")
 //   headerOverride         — en-tête à envoyer au backend
+//   footerOverride         — pied à envoyer au backend (édition ponctuelle modal envoi)
 // }
 //
 // Atomicité :
@@ -1684,7 +1685,7 @@ async function sendSupplierBatch(supplier, itemsToSend, opts = {}) {
   const {
     orderId = null, stepId = null,
     isReminder = false, parentBatchId = null,
-    subjectOverride = null, headerOverride = null,
+    subjectOverride = null, headerOverride = null, footerOverride = null,
   } = opts;
 
   const ctx = { date: window.SUPPLIER_TEMPLATES.formatDate(), supplier_name: supplier.name };
@@ -1694,7 +1695,9 @@ async function sendSupplierBatch(supplier, itemsToSend, opts = {}) {
   const header  = headerOverride  != null
     ? headerOverride
     : window.SUPPLIER_TEMPLATES.applyPlaceholders(supplier.template_header  || window.SUPPLIER_TEMPLATES.defaultHeader,  ctx);
-  const footer  = window.SUPPLIER_TEMPLATES.applyPlaceholders(supplier.template_footer  || window.SUPPLIER_TEMPLATES.defaultFooter,  ctx);
+  const footer  = footerOverride  != null
+    ? footerOverride
+    : window.SUPPLIER_TEMPLATES.applyPlaceholders(supplier.template_footer  || window.SUPPLIER_TEMPLATES.defaultFooter,  ctx);
 
   const groupedBlocks = groupItemsByBatch(itemsToSend);
   const blocks = groupedBlocks.map(block => ({
@@ -1999,14 +2002,22 @@ function bindSupplierCarts() {
   }));
 }
 
+// Modal d'envoi fournisseur avec édition ponctuelle du sujet/header/footer.
+// Les valeurs initiales viennent du template du fournisseur (Réglages) ;
+// toute modif est locale à l'ouverture (réinitialisée à chaque appel).
 function openSupplierSendPreview(supplier, items) {
   const ctx = { date: window.SUPPLIER_TEMPLATES.formatDate(), supplier_name: supplier.name };
-  const subject = window.SUPPLIER_TEMPLATES.applyPlaceholders(supplier.template_subject || window.SUPPLIER_TEMPLATES.defaultSubject, ctx);
-  const header  = window.SUPPLIER_TEMPLATES.applyPlaceholders(supplier.template_header  || window.SUPPLIER_TEMPLATES.defaultHeader,  ctx);
-  const footer  = window.SUPPLIER_TEMPLATES.applyPlaceholders(supplier.template_footer  || window.SUPPLIER_TEMPLATES.defaultFooter,  ctx);
+  const initialSubject = window.SUPPLIER_TEMPLATES.applyPlaceholders(supplier.template_subject || window.SUPPLIER_TEMPLATES.defaultSubject, ctx);
+  const initialHeader  = window.SUPPLIER_TEMPLATES.applyPlaceholders(supplier.template_header  || window.SUPPLIER_TEMPLATES.defaultHeader,  ctx);
+  const initialFooter  = window.SUPPLIER_TEMPLATES.applyPlaceholders(supplier.template_footer  || window.SUPPLIER_TEMPLATES.defaultFooter,  ctx);
 
+  // Valeurs locales : écrasées à chaque ouverture, jamais persistées.
+  let localSubject = initialSubject;
+  let localHeader  = initialHeader;
+  let localFooter  = initialFooter;
+
+  // Blocs figés : pas éditables, calculés une seule fois.
   const blocks = groupItemsByBatch(items);
-  const previewHtml = renderSupplierMailBodyHtml(header, footer, blocks);
 
   const overlay = document.createElement("div");
   overlay.className = "modal-overlay";
@@ -2024,12 +2035,20 @@ function openSupplierSendPreview(supplier, items) {
       </div>
       <div class="modal-body">
         <div>
-          <label class="field-label">Sujet</label>
-          <input class="field-input" type="text" value="${escapeHtml(subject)}" readonly>
+          <label class="field-label" for="ssp-subject">Sujet</label>
+          <input id="ssp-subject" class="field-input" type="text" value="${escapeHtml(initialSubject)}">
         </div>
         <div>
-          <label class="field-label">Aperçu du mail</label>
-          <div class="preview-box">${previewHtml}</div>
+          <label class="field-label" for="ssp-header">Début du mail</label>
+          <textarea id="ssp-header" class="field-textarea ssp-edit-area" rows="5">${escapeHtml(initialHeader)}</textarea>
+        </div>
+        <div>
+          <label class="field-label">Aperçu du mail tel qu'il sera envoyé</label>
+          <div class="preview-box" id="ssp-preview"></div>
+        </div>
+        <div>
+          <label class="field-label" for="ssp-footer">Fin du mail</label>
+          <textarea id="ssp-footer" class="field-textarea ssp-edit-area" rows="4">${escapeHtml(initialFooter)}</textarea>
         </div>
       </div>
       <div class="modal-footer">
@@ -2041,6 +2060,26 @@ function openSupplierSendPreview(supplier, items) {
   document.body.style.overflow = "hidden";
   document.body.style.position = "fixed";
   document.body.style.width = "100%";
+
+  const subjectEl = overlay.querySelector("#ssp-subject");
+  const headerEl  = overlay.querySelector("#ssp-header");
+  const footerEl  = overlay.querySelector("#ssp-footer");
+  const previewEl = overlay.querySelector("#ssp-preview");
+
+  function updatePreviewHtml() {
+    previewEl.innerHTML = renderSupplierMailBodyHtml(localHeader, localFooter, blocks);
+  }
+  updatePreviewHtml();
+
+  subjectEl.addEventListener("input", e => { localSubject = e.target.value; });
+  headerEl.addEventListener("input", e => {
+    localHeader = e.target.value;
+    updatePreviewHtml();
+  });
+  footerEl.addEventListener("input", e => {
+    localFooter = e.target.value;
+    updatePreviewHtml();
+  });
 
   function close() {
     document.body.style.overflow = ""; document.body.style.position = ""; document.body.style.width = "";
@@ -2065,7 +2104,13 @@ function openSupplierSendPreview(supplier, items) {
       const sids = new Set(items.map(it => it.step_id));
       const unifiedOrderId = oids.size === 1 ? [...oids][0] : null;
       const unifiedStepId  = sids.size === 1 ? [...sids][0] : null;
-      const result = await sendSupplierBatch(supplier, items, { orderId: unifiedOrderId, stepId: unifiedStepId });
+      const result = await sendSupplierBatch(supplier, items, {
+        orderId: unifiedOrderId,
+        stepId: unifiedStepId,
+        subjectOverride: localSubject,
+        headerOverride:  localHeader,
+        footerOverride:  localFooter,
+      });
       close();
       if (!result.warning) {
         showToast(`✓ Envoyé à ${supplier.name} — ${items.length} article${items.length>1?"s":""}`);
