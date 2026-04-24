@@ -617,6 +617,33 @@ header {
 /* Header/footer éditables dans la modal d'envoi fournisseur :
    textareas courts (rows="4-5") au lieu du min-height:180px global. */
 .modal-body .field-textarea.ssp-edit-area { min-height:0; }
+
+/* Modal d'envoi fournisseur : hiérarchie visuelle inversée.
+   Les champs éditables sautent aux yeux (fond clair, bordure marquée),
+   l'aperçu reste secondaire (fond discret, bordure pointillée, cursor default). */
+.modal-body .ssp-editable {
+  background:rgba(255,255,255,.08);
+  border:1px solid rgba(255,255,255,.18);
+  cursor:text;
+  transition:border-color .15s, background .15s, box-shadow .15s;
+}
+.modal-body .ssp-editable:hover { background:rgba(255,255,255,.1); }
+.modal-body .ssp-editable:focus {
+  background:rgba(255,255,255,.12);
+  border-color:rgba(59,130,246,.6);
+  box-shadow:0 0 0 2px rgba(59,130,246,.15);
+}
+.modal-body .field-label-edit { color:var(--text); }
+.modal-body .field-label-readonly { color:var(--muted); }
+/* L'aperçu conserve son fond clair (le preview HTML utilise des couleurs
+   #555/#888/#ccc qui supposent un fond blanc) mais devient visuellement
+   secondaire : bordure pointillée, opacité réduite, cursor default. */
+.modal-body #ssp-preview.ssp-preview-readonly {
+  border:1px dashed rgba(255,255,255,.18);
+  opacity:.85;
+  cursor:default;
+}
+.modal-body #ssp-preview.ssp-preview-readonly * { cursor:default; }
 .reminder-preview-table {
   width:100%; border-collapse:collapse; font-family:var(--mono); font-size:12px;
   background:var(--bg3); border-radius:8px; overflow:hidden;
@@ -1602,10 +1629,15 @@ function openSupplierCartModal(order, stepLabel, stepId, progress) {
       // Flux A unifié : on insère les items puis on ouvre la modal d'envoi (éditable).
       // L'envoi effectif passe par openSupplierSendPreview → sendSupplierBatch avec
       // subject/header/footer overrides issus des textareas. Pas d'envoi direct.
+      // rollbackOnCancel : si l'utilisateur annule l'aperçu, on retire les items
+      // qu'on vient d'insérer (sémantique "envoi immédiat", pas "ajout au panier").
       const inserted = await insertIntoCart(sel.key, sel.picked, sel.notes);
       close();
       render();
-      openSupplierSendPreview(supplier, inserted);
+      openSupplierSendPreview(supplier, inserted, {
+        rollbackOnCancel: true,
+        rollbackIds: inserted.map(it => it.id),
+      });
     } catch (err) {
       console.error(err);
       btnSend.disabled = false; btnSend.innerHTML = "📨 Envoyer (avec aperçu)";
@@ -2005,7 +2037,10 @@ function bindSupplierCarts() {
 // Modal d'envoi fournisseur avec édition ponctuelle du sujet/header/footer.
 // Les valeurs initiales viennent du template du fournisseur (Réglages) ;
 // toute modif est locale à l'ouverture (réinitialisée à chaque appel).
-function openSupplierSendPreview(supplier, items) {
+// opts.rollbackOnCancel : si true, l'annulation supprime les items ciblés par
+// opts.rollbackIds (cas flux A : items insérés juste avant l'ouverture).
+// Flux B (vue Paniers) n'utilise PAS ce flag : les items préexistants restent.
+function openSupplierSendPreview(supplier, items, opts = {}) {
   const ctx = { date: window.SUPPLIER_TEMPLATES.formatDate(), supplier_name: supplier.name };
   const initialSubject = window.SUPPLIER_TEMPLATES.applyPlaceholders(supplier.template_subject || window.SUPPLIER_TEMPLATES.defaultSubject, ctx);
   const initialHeader  = window.SUPPLIER_TEMPLATES.applyPlaceholders(supplier.template_header  || window.SUPPLIER_TEMPLATES.defaultHeader,  ctx);
@@ -2035,20 +2070,20 @@ function openSupplierSendPreview(supplier, items) {
       </div>
       <div class="modal-body">
         <div>
-          <label class="field-label" for="ssp-subject">Sujet</label>
-          <input id="ssp-subject" class="field-input" type="text" value="${escapeHtml(initialSubject)}">
+          <label class="field-label field-label-edit" for="ssp-subject">✎ Sujet (éditable)</label>
+          <input id="ssp-subject" class="field-input ssp-editable" type="text" value="${escapeHtml(initialSubject)}">
         </div>
         <div>
-          <label class="field-label" for="ssp-header">Début du mail</label>
-          <textarea id="ssp-header" class="field-textarea ssp-edit-area" rows="5">${escapeHtml(initialHeader)}</textarea>
+          <label class="field-label field-label-edit" for="ssp-header">✎ Début du mail (éditable)</label>
+          <textarea id="ssp-header" class="field-textarea ssp-edit-area ssp-editable" rows="5">${escapeHtml(initialHeader)}</textarea>
         </div>
         <div>
-          <label class="field-label">Aperçu du mail tel qu'il sera envoyé</label>
-          <div class="preview-box" id="ssp-preview"></div>
+          <label class="field-label field-label-readonly">👁 Aperçu du rendu (non éditable)</label>
+          <div class="preview-box ssp-preview-readonly" id="ssp-preview"></div>
         </div>
         <div>
-          <label class="field-label" for="ssp-footer">Fin du mail</label>
-          <textarea id="ssp-footer" class="field-textarea ssp-edit-area" rows="4">${escapeHtml(initialFooter)}</textarea>
+          <label class="field-label field-label-edit" for="ssp-footer">✎ Fin du mail (éditable)</label>
+          <textarea id="ssp-footer" class="field-textarea ssp-edit-area ssp-editable" rows="4">${escapeHtml(initialFooter)}</textarea>
         </div>
       </div>
       <div class="modal-footer">
@@ -2081,10 +2116,28 @@ function openSupplierSendPreview(supplier, items) {
     updatePreviewHtml();
   });
 
-  function close() {
+  // sent=true évite le rollback quand close() est appelé après un envoi réussi.
+  let sent = false;
+
+  async function close() {
+    // Flux A : si l'utilisateur annule (fermeture sans envoi), on retire les items
+    // qu'on vient d'insérer en DB. Ciblage par id exact → pas de risque de
+    // supprimer des items legitimes d'un autre onglet.
+    if (!sent && opts?.rollbackOnCancel && Array.isArray(opts.rollbackIds) && opts.rollbackIds.length) {
+      try {
+        const { error } = await sb.from("supplier_cart_items").delete().in("id", opts.rollbackIds);
+        if (error) throw error;
+        const idsSet = new Set(opts.rollbackIds);
+        S.supplierCartItems = S.supplierCartItems.filter(it => !idsSet.has(it.id));
+      } catch (err) {
+        console.error("Rollback failed:", err);
+        showToast("⚠ Impossible d'annuler l'insertion en panier, vérifier");
+      }
+    }
     document.body.style.overflow = ""; document.body.style.position = ""; document.body.style.width = "";
     overlay.remove();
     document.removeEventListener("keydown", onKey);
+    render();
   }
   function onKey(e) { if (e.key==="Escape") close(); }
   document.addEventListener("keydown", onKey);
@@ -2111,6 +2164,7 @@ function openSupplierSendPreview(supplier, items) {
         headerOverride:  localHeader,
         footerOverride:  localFooter,
       });
+      sent = true;
       close();
       if (!result.warning) {
         showToast(`✓ Envoyé à ${supplier.name} — ${items.length} article${items.length>1?"s":""}`);
