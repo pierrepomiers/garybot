@@ -85,6 +85,32 @@ header {
 .menu-item:disabled { opacity:.4; cursor:not-allowed; }
 .menu-divider { height:1px; background:var(--border); margin:4px 6px; }
 
+/* ── RAPPELS PANIERS FOURNISSEURS ── */
+.reminders-container {
+  display:flex; flex-direction:column; gap:8px;
+  padding:10px 10px 0;
+}
+.reminder-banner {
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  padding:12px 14px; border-radius:10px;
+  font-size:14px; font-weight:500; line-height:1.3;
+  cursor:pointer; border:1px solid transparent;
+  transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
+}
+.reminder-banner:hover { transform: translateY(-1px); }
+.reminder-banner:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.reminder-banner.reminder-today {
+  background:rgba(234,179,8,.12); border-color:rgba(234,179,8,.30); color:#fde68a;
+}
+.reminder-banner.reminder-late {
+  background:rgba(249,115,22,.14); border-color:rgba(249,115,22,.35); color:#fed7aa;
+}
+.reminder-banner.reminder-overdue {
+  background:rgba(220,38,38,.14); border-color:rgba(220,38,38,.40); color:#fecaca;
+}
+.reminder-text { flex:1; min-width:0; }
+.reminder-arrow { font-size:18px; opacity:.7; flex:0 0 auto; }
+
 /* ── STATS ── */
 .stats-bar {
   display:grid; grid-template-columns:repeat(4, 1fr); gap:6px;
@@ -901,6 +927,58 @@ function pendingItemsForSupplier(key) {
 
 function totalPendingCartCount() {
   return S.supplierCartItems.length;
+}
+
+// Renvoie la dernière occurrence de (jourSemaine, heure) <= now.
+// mailJour : 1=lundi … 7=dimanche. timeStr : "HH:MM:SS".
+function getLastScheduledDateTime(mailJour, timeStr, now) {
+  const [hh, mm] = String(timeStr || "00:00:00").split(":").map(Number);
+  const targetJsDay = mailJour === 7 ? 0 : mailJour; // JS : 0=dim … 6=sam
+  const candidate = new Date(now);
+  candidate.setHours(hh || 0, mm || 0, 0, 0);
+  while (candidate.getDay() !== targetJsDay || candidate > now) {
+    candidate.setDate(candidate.getDate() - 1);
+  }
+  return candidate;
+}
+
+function getDayNameCapitalized(mailJour) {
+  const w = WEEKDAYS_FR[mailJour];
+  return w ? w.charAt(0).toUpperCase() + w.slice(1) : "?";
+}
+
+// Retourne { daysOverdue, wording, className } ou null si pas de rappel.
+function computeSupplierReminder(supplier) {
+  if (!supplier || supplier.active === false) return null;
+  if (supplier.mail_mode !== "hebdo") return null;
+  if (!supplier.mail_jour || !supplier.mail_heure) return null;
+  const items = pendingItemsForSupplier(supplier.key);
+  if (!items.length) return null;
+  const now = new Date();
+  const scheduled = getLastScheduledDateTime(supplier.mail_jour, supplier.mail_heure, now);
+  const daysOverdue = Math.floor((now - scheduled) / 86400000);
+  if (daysOverdue < 0 || daysOverdue > 30) return null;
+  const n = items.length;
+  const name = supplier.name || supplier.key;
+  if (daysOverdue === 0) {
+    return {
+      daysOverdue,
+      wording: `📦 ${getDayNameCapitalized(supplier.mail_jour)} — pense à envoyer le panier ${name} (${n} items)`,
+      className: "reminder-today",
+    };
+  }
+  if (daysOverdue <= 3) {
+    return {
+      daysOverdue,
+      wording: `⚠️ Panier ${name} en retard depuis ${daysOverdue} jour${daysOverdue > 1 ? "s" : ""} (${n} items)`,
+      className: "reminder-late",
+    };
+  }
+  return {
+    daysOverdue,
+    wording: `🔴 Panier ${name} oublié — ${daysOverdue} jours de retard (${n} items)`,
+    className: "reminder-overdue",
+  };
 }
 
 async function loadStepsAndMeta() {
@@ -2406,7 +2484,23 @@ function renderOrders() {
   const terminees = active.filter(o=>getProgress(o.id)===100).length;
   const orders    = filteredOrders();
 
+  const reminders = Object.values(S.suppliersByKey)
+    .map(s => ({ supplier: s, reminder: computeSupplierReminder(s) }))
+    .filter(x => x.reminder !== null)
+    .sort((a, b) => b.reminder.daysOverdue - a.reminder.daysOverdue);
+  const remindersHtml = reminders.length === 0 ? "" : `
+    <div class="reminders-container">
+      ${reminders.map(({ supplier, reminder }) => `
+        <div class="reminder-banner ${reminder.className}"
+             data-reminder-supplier-key="${escapeHtml(supplier.key)}"
+             role="button" tabindex="0">
+          <span class="reminder-text">${escapeHtml(reminder.wording)}</span>
+          <span class="reminder-arrow">→</span>
+        </div>`).join("")}
+    </div>`;
+
   return `
+  ${remindersHtml}
   <div class="stats-bar">
     <div class="stat-chip stat-spacer" aria-hidden="true"></div>
     <div class="stat-chip"><span class="stat-num" style="color:var(--orange)">${enCours}</span><span class="stat-label">en cours</span></div>
@@ -2782,6 +2876,19 @@ function bindOrders() {
     rerenderOrdersList();
   });
   document.getElementById("filter-select")?.addEventListener("change", e=>{ S.filter=e.target.value; render(); });
+  document.querySelectorAll("[data-reminder-supplier-key]").forEach(el => {
+    const go = () => {
+      const key = el.dataset.reminderSupplierKey;
+      S.view = "supplier_carts";
+      render();
+      setTimeout(() => {
+        const card = document.querySelector(`[data-supplier-key="${key}"]`);
+        if (card) card.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 100);
+    };
+    el.addEventListener("click", go);
+    el.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } });
+  });
   bindOrderCards();
 }
 
@@ -3152,6 +3259,15 @@ document.addEventListener("click", (e) => {
 
 async function boot() { initSB(); render(); await checkSession(); render(); }
 boot();
+
+// Tick à la minute : permet aux rappels de panier de franchir leurs seuils
+// (passage jour J / passage en retard / +1 jour) sans reload manuel.
+if (!window.__garybotMinuteTick) {
+  window.__garybotMinuteTick = setInterval(() => {
+    if (S.view !== "orders" || !S.user) return;
+    render();
+  }, 60_000);
+}
 </script>
 <script>
   
