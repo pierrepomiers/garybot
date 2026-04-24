@@ -1681,7 +1681,7 @@ function openSupplierCartModal(order, stepLabel, stepId, progress) {
     const clientName = (order.partner_detail?.name || "").trim();
     let finalNotes = notes || null;
     if (key === "ben" && clientName) {
-      finalNotes = notes ? `${clientName}\n${notes}` : clientName;
+      finalNotes = notes ? `${clientName} / ${notes}` : clientName;
     }
     const rows = picked.map(l => ({
       supplier_key: key,
