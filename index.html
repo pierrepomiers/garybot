@@ -213,6 +213,7 @@ header {
 
 .mail-btn { font-size:12px; padding:5px 10px; border-radius:99px; border:1px solid; font-family:var(--mono); text-decoration:none; display:inline-flex; align-items:center; gap:4px; flex-shrink:0; }
 .mail-client  { background:rgba(59,130,246,.12); color:#bfdbfe;    border-color:rgba(59,130,246,.3); }
+.mail-btn.mail-client.has-sent { background:rgba(74,222,128,.14); color:#bbf7d0; border-color:rgba(74,222,128,.35); }
 
 .livraison-info { padding-left:34px; font-size:13px; color:var(--muted); display:flex; flex-direction:column; gap:4px; }
 .livraison-info .addr { color:var(--text); font-weight:500; }
@@ -2325,7 +2326,10 @@ function renderCard(order) {
 
     let clientHtml = "";
     if (step.clientMail && isDone) {
-      clientHtml=`<button class="mail-btn mail-client" data-msg-oid="${oid}" data-msg-step="${step.id}" title="Écrire au client">✉️ client</button>`;
+      const lastClientSent = meta.emails_sent?.[step.id];
+      const clientDateLabel = lastClientSent ? ` · ${fmtShortDate(lastClientSent)}` : "";
+      const clientSentClass = lastClientSent ? " has-sent" : "";
+      clientHtml=`<button class="mail-btn mail-client${clientSentClass}" data-msg-oid="${oid}" data-msg-step="${step.id}" title="Écrire au client">✉️ client${clientDateLabel}</button>`;
     }
 
     let invoiceHtml = "";
@@ -2348,9 +2352,17 @@ function renderCard(order) {
     let reminderBtnsHtml = "";
     if (step.fourn && isDone) {
       const hasSent = S.supplierSentIndex.has(`${oid}|${step.id}`);
-      supplierBtnHtml=`<button class="mail-btn mail-supplier${hasSent?" has-sent":""}" data-supplier-oid="${oid}" data-supplier-step="${step.id}" title="Préparer commande fournisseur">📦 ${hasSent?"✓ ":""}fournisseur</button>`;
-
       const sends = getSupplierSendsForStep(oid, step.id);
+      let supplierDateLabel = "";
+      if (hasSent) {
+        const lastDates = sends.map(s => s.stats.last_sent_at).filter(Boolean);
+        if (lastDates.length > 0) {
+          const maxDate = lastDates.reduce((a, b) => a > b ? a : b);
+          supplierDateLabel = ` · ${fmtShortDate(maxDate)}`;
+        }
+      }
+      supplierBtnHtml=`<button class="mail-btn mail-supplier${hasSent?" has-sent":""}" data-supplier-oid="${oid}" data-supplier-step="${step.id}" title="Préparer commande fournisseur">📦 ${hasSent?"✓ ":""}fournisseur${supplierDateLabel}</button>`;
+
       reminderBtnsHtml = sends
         .filter(s => s.stats.first_batch_id) // besoin du batch d'origine pour relancer
         .map(s => {
