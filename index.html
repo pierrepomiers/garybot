@@ -953,12 +953,16 @@ function computeSupplierReminder(supplier) {
   if (!supplier || supplier.active === false) return null;
   if (supplier.mail_mode !== "hebdo") return null;
   if (!supplier.mail_jour || !supplier.mail_heure) return null;
-  const items = pendingItemsForSupplier(supplier.key);
-  if (!items.length) return null;
+  const allPending = pendingItemsForSupplier(supplier.key);
+  if (!allPending.length) return null;
   const now = new Date();
   const scheduled = getLastScheduledDateTime(supplier.mail_jour, supplier.mail_heure, now);
   const daysOverdue = Math.floor((now - scheduled) / 86400000);
   if (daysOverdue < 0 || daysOverdue > 30) return null;
+  // N'alerter que sur les items antérieurs à la dernière fenêtre d'envoi prévue :
+  // un item ajouté après `scheduled` n'était pas en instance à l'heure d'envoi.
+  const items = allPending.filter(it => it.added_at && new Date(it.added_at) < scheduled);
+  if (!items.length) return null;
   const n = items.length;
   const name = supplier.name || supplier.key;
   if (daysOverdue === 0) {
