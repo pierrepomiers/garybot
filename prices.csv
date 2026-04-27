@@ -1,0 +1,91 @@
+type,category,name,price
+model,,SHORTBOARD,
+model,,HYBRID,
+model,,MIDLENGTH,
+model,,LONGBOARD,
+model,,OTHER,
+size,,5'2,820
+size,,5'3,820
+size,,5'4,830
+size,,5'5,840
+size,,5'6,850
+size,,5'7,860
+size,,5'8,870
+size,,5'9,880
+size,,5'10,900
+size,,5'11,910
+size,,6'0,920
+size,,6'1,930
+size,,6'2,940
+size,,6'3,950
+size,,6'4,960
+size,,6'5,970
+size,,6'6,990
+size,,6'7,1000
+size,,6'8,1010
+size,,6'9,1020
+size,,6'10,1030
+size,,6'11,1040
+size,,7'0,1050
+size,,7'1,1060
+size,,7'2,1070
+size,,7'3,1080
+size,,7'4,1100
+size,,7'5,1110
+size,,7'6,1120
+size,,7'7,1130
+size,,7'8,1140
+size,,7'9,1150
+size,,7'10,1170
+size,,7'11,1180
+size,,8'0,1190
+size,,8'1,1200
+size,,8'2,1210
+size,,8'3,1220
+size,,8'4,1240
+size,,8'5,1250
+size,,8'6,1260
+size,,8'7,1270
+size,,8'8,1280
+size,,8'9,1290
+size,,8'10,1310
+size,,8'11,1320
+size,,9'0,1320
+size,,9'1,1330
+size,,9'2,1350
+size,,9'3,1360
+size,,9'4,1370
+size,,9'5,1380
+size,,9'6,1390
+option,construction,KORKO,100
+option,construction,GREENONE,150
+option,construction,GREENFLX,250
+option,construction,R-CARBON,400
+option,construction,BLACKFLX,650
+option,deco,DECO SB,80
+option,deco,DECO ML,120
+option,deco,DECO LB,200
+option,fins,CHANNELS,90
+option,fins,TWIN,0
+option,fins,3 FINS,0
+option,fins,4 FINS,20
+option,fins,5 FINS,30
+option,fins,2+1 US,0
+option,fins,4+1 US,30
+option,fins,1 US,0
+option,leash,LEASH 6'',30
+option,leash,LEASH 7'',31
+option,leash,LEASH 8'',32
+option,leash,LEASH 9'',34
+option,boardbag,BORDBAG 6',87
+option,boardbag,BOARDBG 6'7,89
+option,boardbag,BOARDBAG 7',90
+option,boardbag,BOARDBG 7'6,93
+option,boardbag,BOARDBG 8'',95
+option,boardbag,BOARDBAG 9',114
+option,pad,PAD ARRIERE,48
+speciality,,SURFOIL,400
+speciality,,WINGFOIL,800
+speciality,,DOWNWIND,1000
+speciality,,SUP,500
+speciality,,SUPFOIL,1500

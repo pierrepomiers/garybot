@@ -62,6 +62,21 @@ header {
 .hamburger-btn span {
   display:block; width:20px; height:2px; background:currentColor; border-radius:2px;
 }
+.calc-btn {
+  background:var(--bg3); border:1px solid var(--border);
+  height:42px; padding:4px 8px; border-radius:10px;
+  display:inline-flex; align-items:center; justify-content:center;
+  transition:all .15s;
+}
+.calc-btn img {
+  height:30px; width:auto; display:block;
+  image-rendering:pixelated; image-rendering:-moz-crisp-edges;
+}
+.calc-modal-icon {
+  height:28px; width:auto; display:block;
+  image-rendering:pixelated; image-rendering:-moz-crisp-edges;
+}
+.calc-btn:hover { border-color:rgba(59,130,246,.4); background:rgba(59,130,246,.08); }
 .main-menu {
   position:absolute; top:calc(100% + 8px); right:0;
   background:var(--bg2); border:1px solid var(--border); border-radius:12px;
@@ -411,6 +426,64 @@ header {
   .modal-overlay { padding:0; align-items:stretch; height:100dvh; }
   .modal-card { max-width:none; height:100dvh; max-height:100dvh; border-radius:0; border:none; }
 }
+
+/* ── PRICE CALCULATOR ── */
+.calc-section { display:flex; flex-direction:column; gap:6px; }
+.calc-section + .calc-section { padding-top:10px; border-top:1px dashed var(--border); }
+.calc-section .field-label { margin-bottom:0; }
+.calc-select {
+  width:100%; background:var(--bg3); border:1px solid var(--border); color:var(--text);
+  padding:10px 12px; border-radius:8px; font-size:14px; outline:none;
+  font-family:var(--sans); appearance:none;
+  background-image:linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position: calc(100% - 18px) center, calc(100% - 13px) center;
+  background-size:5px 5px, 5px 5px; background-repeat:no-repeat; padding-right:34px;
+}
+.calc-select:focus { border-color:rgba(59,130,246,.45); }
+.calc-grid {
+  display:grid; grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); gap:6px;
+}
+.calc-pill {
+  display:flex; align-items:center; justify-content:space-between; gap:6px;
+  background:var(--bg3); border:1px solid var(--border); color:var(--text);
+  padding:9px 10px; border-radius:8px; font-size:13px; cursor:pointer;
+  transition:border-color .15s, background .15s;
+  user-select:none;
+}
+.calc-pill input { display:none; }
+.calc-pill:hover { border-color:rgba(59,130,246,.35); }
+.calc-pill .calc-pill-name { font-family:var(--mono); font-size:12px; letter-spacing:.02em; }
+.calc-pill .calc-pill-price { color:var(--muted); font-family:var(--mono); font-size:11px; flex-shrink:0; }
+.calc-pill.active {
+  background:rgba(59,130,246,.18); border-color:rgba(59,130,246,.55); color:#dbeafe;
+}
+.calc-pill.active .calc-pill-price { color:#bfdbfe; }
+.calc-total-bar {
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  padding:10px 14px; background:rgba(59,130,246,.1); border-radius:10px;
+  border:1px solid rgba(59,130,246,.3);
+}
+.calc-total-label { font-family:var(--mono); font-size:11px; color:var(--muted); letter-spacing:.08em; text-transform:uppercase; }
+.calc-total-value { font-family:var(--mono); font-size:22px; font-weight:700; color:var(--accent); }
+.calc-detail-toggle {
+  background:transparent; border:none; color:var(--muted); font-family:var(--mono);
+  font-size:12px; padding:4px 0; cursor:pointer; text-decoration:underline;
+}
+.calc-detail-toggle:hover { color:var(--text); }
+.calc-detail {
+  background:var(--bg3); border:1px solid var(--border); border-radius:8px;
+  padding:10px 12px; font-family:var(--mono); font-size:12px; color:var(--text);
+  white-space:pre-wrap; line-height:1.6;
+}
+.calc-detail.hidden { display:none; }
+.btn-calc-copy {
+  background:rgba(74,222,128,.15); color:#bbf7d0; border-color:rgba(74,222,128,.4);
+}
+.btn-calc-copy:hover:not(:disabled) { background:rgba(74,222,128,.25); }
+.btn-calc-sms {
+  background:rgba(245,158,11,.15); color:#fcd34d; border-color:rgba(245,158,11,.4);
+}
+.btn-calc-sms:hover:not(:disabled) { background:rgba(245,158,11,.25); }
 
 /* ── NAV BADGE ── */
 .nav-badge {
@@ -1497,6 +1570,523 @@ function openClientMessageModal(order, stepLabel, stepId, progress) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// PRICE CALCULATOR (prices.csv → modal calcul)
+// ══════════════════════════════════════════════════════════════════════════════
+
+function parsePriceCsv(text) {
+  // Format simple : type,category,name,price (pas de virgule dans les valeurs).
+  const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+  if (lines.length === 0) return [];
+  lines.shift(); // header
+  const rows = [];
+  for (const line of lines) {
+    const cols = line.split(",");
+    if (cols.length < 4) continue;
+    const type     = (cols[0] || "").trim();
+    const category = (cols[1] || "").trim();
+    const name     = (cols[2] || "").trim();
+    const priceRaw = (cols[3] || "").trim();
+    rows.push({
+      type, category, name,
+      price: priceRaw === "" ? null : Number(priceRaw),
+    });
+  }
+  return rows;
+}
+
+function buildPriceCatalog(rows) {
+  const cat = {
+    models: [],
+    sizes: [],
+    options: { construction: [], deco: [], fins: [], leash: [], boardbag: [], pad: [] },
+    specialities: [],
+  };
+  for (const r of rows) {
+    if (r.type === "model") cat.models.push({ name: r.name });
+    else if (r.type === "size") cat.sizes.push({ name: r.name, price: r.price });
+    else if (r.type === "option" && cat.options[r.category]) {
+      cat.options[r.category].push({ name: r.name, price: r.price });
+    }
+    else if (r.type === "speciality") cat.specialities.push({ name: r.name, price: r.price });
+  }
+  return cat;
+}
+
+async function loadPriceCatalog() {
+  if (window.PRICES_DATA) return window.PRICES_DATA;
+  const resp = await fetch(`./prices.csv?v=${Date.now()}`);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  const text = await resp.text();
+  window.PRICES_DATA = buildPriceCatalog(parsePriceCsv(text));
+  return window.PRICES_DATA;
+}
+
+function fmtEuro(n) {
+  return new Intl.NumberFormat("fr-FR").format(n) + " €";
+}
+
+function openPriceCalculator() {
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal-card" role="dialog" aria-modal="true">
+      <div class="modal-header">
+        <div class="modal-title">
+          <img src="CALC.png" alt="" aria-hidden="true" class="modal-title-icon calc-modal-icon">
+          <span class="modal-title-text"><span>Calculateur de prix</span></span>
+        </div>
+        <button class="modal-close" data-close aria-label="Fermer">×</button>
+      </div>
+      <div class="modal-body" id="calc-body">
+        <div class="loading"><div class="spinner"></div><br>Chargement des prix...</div>
+      </div>
+    </div>`;
+
+  document.body.appendChild(overlay);
+  document.body.style.overflow = "hidden";
+  document.body.style.position = "fixed";
+  document.body.style.width = "100%";
+
+  function close() {
+    document.body.style.overflow = "";
+    document.body.style.position = "";
+    document.body.style.width = "";
+    overlay.remove();
+    document.removeEventListener("keydown", onKey);
+  }
+  function onKey(e) { if (e.key === "Escape") close(); }
+  document.addEventListener("keydown", onKey);
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
+  // [data-close] attaché après render, mais le bouton du header est déjà là :
+  overlay.querySelector(".modal-header [data-close]")?.addEventListener("click", close);
+
+  loadPriceCatalog()
+    .then(catalog => renderCalcModal(overlay, catalog, close))
+    .catch(err => {
+      const body = overlay.querySelector("#calc-body");
+      if (body) body.innerHTML = `<div class="modal-info-banner">⚠ Impossible de charger prices.csv : ${escapeHtml(err.message || String(err))}</div>`;
+    });
+}
+
+function renderCalcModal(overlay, catalog, close) {
+  // CHANNELS = checkbox additionnelle, autres fins = radios.
+  const finsRadios = catalog.options.fins.filter(o => o.name !== "CHANNELS");
+  const channelsOpt = catalog.options.fins.find(o => o.name === "CHANNELS") || null;
+  const padOpt = catalog.options.pad[0] || null;
+
+  const sel = {
+    model: catalog.models[0]?.name || null,
+    size: null,
+    construction: null,
+    decos: new Set(),     // indices dans catalog.options.deco
+    fins: null,
+    channels: false,
+    leash: null,
+    boardbag: null,
+    pad: false,
+    speciality: null,
+  };
+
+  const card = overlay.querySelector(".modal-card");
+  const oldBody = card.querySelector("#calc-body");
+
+  const pillRadio = (group, idx, label, price) => `
+    <label class="calc-pill">
+      <input type="radio" name="calc-${group}" value="${idx}">
+      <span class="calc-pill-name">${escapeHtml(label)}</span>
+      <span class="calc-pill-price">${price === 0 ? "0 €" : "+" + fmtEuro(price)}</span>
+    </label>`;
+  const pillCheckbox = (group, idx, label, price) => `
+    <label class="calc-pill">
+      <input type="checkbox" name="calc-${group}" value="${idx}">
+      <span class="calc-pill-name">${escapeHtml(label)}</span>
+      <span class="calc-pill-price">+${fmtEuro(price)}</span>
+    </label>`;
+  const pillNone = (group) => `
+    <label class="calc-pill"><input type="radio" name="calc-${group}" value="" checked>
+      <span class="calc-pill-name">Aucune</span>
+      <span class="calc-pill-price">0 €</span>
+    </label>`;
+
+  oldBody.outerHTML = `
+    <div class="modal-body" id="calc-body">
+      <div class="calc-section">
+        <label class="field-label" for="calc-model">Modèle</label>
+        <select id="calc-model" class="calc-select">
+          ${catalog.models.map(m => `<option value="${escapeHtml(m.name)}">${escapeHtml(m.name)}</option>`).join("")}
+        </select>
+      </div>
+
+      <div class="calc-section">
+        <label class="field-label" for="calc-size">Taille *</label>
+        <select id="calc-size" class="calc-select">
+          <option value="">— Choisir une taille —</option>
+          ${catalog.sizes.map((s, i) => `<option value="${i}">${escapeHtml(s.name)} — ${fmtEuro(s.price)}</option>`).join("")}
+        </select>
+      </div>
+
+      <div class="calc-section">
+        <label class="field-label">Construction</label>
+        <div class="calc-grid" data-group="construction">
+          ${pillNone("construction")}
+          ${catalog.options.construction.map((o, i) => pillRadio("construction", i, o.name, o.price)).join("")}
+        </div>
+      </div>
+
+      <div class="calc-section">
+        <label class="field-label">Déco</label>
+        <div class="calc-grid" data-group="deco">
+          ${catalog.options.deco.map((o, i) => pillCheckbox("deco", i, o.name, o.price)).join("")}
+        </div>
+      </div>
+
+      <div class="calc-section">
+        <label class="field-label">Setup fins</label>
+        <div class="calc-grid" data-group="fins">
+          ${pillNone("fins")}
+          ${finsRadios.map((o, i) => pillRadio("fins", i, o.name, o.price)).join("")}
+        </div>
+        ${channelsOpt ? `
+        <div class="calc-grid" data-group="channels" style="margin-top:6px;">
+          ${pillCheckbox("channels", 0, channelsOpt.name, channelsOpt.price)}
+        </div>` : ""}
+      </div>
+
+      <div class="calc-section">
+        <label class="field-label">Leash</label>
+        <div class="calc-grid" data-group="leash">
+          ${pillNone("leash")}
+          ${catalog.options.leash.map((o, i) => pillRadio("leash", i, o.name, o.price)).join("")}
+        </div>
+      </div>
+
+      <div class="calc-section">
+        <label class="field-label">Boardbag</label>
+        <div class="calc-grid" data-group="boardbag">
+          ${pillNone("boardbag")}
+          ${catalog.options.boardbag.map((o, i) => pillRadio("boardbag", i, o.name, o.price)).join("")}
+        </div>
+      </div>
+
+      ${padOpt ? `
+      <div class="calc-section">
+        <label class="field-label">Accessoires</label>
+        <div class="calc-grid" data-group="pad">
+          ${pillCheckbox("pad", 0, padOpt.name, padOpt.price)}
+        </div>
+      </div>` : ""}
+
+      <div class="calc-section">
+        <label class="field-label">Speciality</label>
+        <div class="calc-grid" data-group="speciality">
+          ${pillNone("speciality")}
+          ${catalog.specialities.map((o, i) => pillRadio("speciality", i, o.name, o.price)).join("")}
+        </div>
+      </div>
+
+      <div>
+        <button type="button" class="calc-detail-toggle" id="calc-detail-toggle">▸ Détail du calcul</button>
+        <div class="calc-detail hidden" id="calc-detail"></div>
+      </div>
+    </div>`;
+
+  // Footer
+  card.insertAdjacentHTML("beforeend", `
+    <div class="modal-footer" style="flex-direction:column; gap:8px;">
+      <div class="calc-total-bar" style="width:100%;">
+        <span class="calc-total-label">Total</span>
+        <span class="calc-total-value" id="calc-total">0 €</span>
+      </div>
+      <div style="display:flex; gap:8px; width:100%;">
+        <button class="btn-modal-send btn-calc-copy" id="calc-copy" style="flex:1;">📋 Copier</button>
+        <button class="btn-modal-send" id="calc-email" style="flex:1;">📧 Email</button>
+        <button class="btn-modal-send btn-calc-sms" id="calc-sms" style="flex:1;">💬 SMS</button>
+      </div>
+    </div>`);
+
+  const body         = card.querySelector("#calc-body");
+  const totalEl      = card.querySelector("#calc-total");
+  const detailEl     = card.querySelector("#calc-detail");
+  const detailToggle = card.querySelector("#calc-detail-toggle");
+  const copyBtn      = card.querySelector("#calc-copy");
+  const emailBtn     = card.querySelector("#calc-email");
+  const smsBtn       = card.querySelector("#calc-sms");
+  const modelSelect  = card.querySelector("#calc-model");
+  const sizeSelect   = card.querySelector("#calc-size");
+
+  // Re-bind close sur les boutons ajoutés après render
+  card.querySelectorAll("[data-close]").forEach(b => b.addEventListener("click", close));
+
+  function buildLines() {
+    const lines = [];
+    let total = 0;
+    if (sel.model) lines.push(`Modèle : ${sel.model}`);
+    if (sel.size) {
+      total += sel.size.price;
+      lines.push(`Taille : ${sel.size.name} — ${fmtEuro(sel.size.price)}`);
+    }
+    if (sel.construction) {
+      total += sel.construction.price;
+      lines.push(`Construction : ${sel.construction.name} — ${fmtEuro(sel.construction.price)}`);
+    }
+    catalog.options.deco.forEach((d, i) => {
+      if (sel.decos.has(i)) {
+        total += d.price;
+        lines.push(`Déco : ${d.name} — ${fmtEuro(d.price)}`);
+      }
+    });
+    if (sel.fins) {
+      total += sel.fins.price;
+      lines.push(`Setup : ${sel.fins.name} — ${fmtEuro(sel.fins.price)}`);
+    }
+    if (sel.channels && channelsOpt) {
+      total += channelsOpt.price;
+      lines.push(`${channelsOpt.name} — ${fmtEuro(channelsOpt.price)}`);
+    }
+    if (sel.leash) {
+      total += sel.leash.price;
+      lines.push(`Leash : ${sel.leash.name} — ${fmtEuro(sel.leash.price)}`);
+    }
+    if (sel.boardbag) {
+      total += sel.boardbag.price;
+      lines.push(`Boardbag : ${sel.boardbag.name} — ${fmtEuro(sel.boardbag.price)}`);
+    }
+    if (sel.pad && padOpt) {
+      total += padOpt.price;
+      lines.push(`Pad arrière — ${fmtEuro(padOpt.price)}`);
+    }
+    if (sel.speciality) {
+      total += sel.speciality.price;
+      lines.push(`Speciality : ${sel.speciality.name} — ${fmtEuro(sel.speciality.price)}`);
+    }
+    return { total, lines };
+  }
+
+  function recompute() {
+    const { total, lines } = buildLines();
+    totalEl.textContent = fmtEuro(total);
+    detailEl.textContent = lines.length
+      ? lines.join("\n") + "\n─────────────\nTOTAL : " + fmtEuro(total)
+      : "Aucune sélection";
+    return { total, lines };
+  }
+
+  modelSelect.addEventListener("change", () => { sel.model = modelSelect.value || null; recompute(); });
+  sizeSelect.addEventListener("change", () => {
+    const v = sizeSelect.value;
+    sel.size = v === "" ? null : catalog.sizes[Number(v)];
+    recompute();
+  });
+
+  body.addEventListener("change", (e) => {
+    const input = e.target;
+    if (!input || input.tagName !== "INPUT") return;
+    const groupEl = input.closest("[data-group]");
+    if (!groupEl) return;
+    const group = groupEl.dataset.group;
+
+    if (input.type === "radio") {
+      groupEl.querySelectorAll(".calc-pill").forEach(p => p.classList.remove("active"));
+      if (input.value !== "") input.closest(".calc-pill").classList.add("active");
+      const idx = input.value === "" ? null : Number(input.value);
+      if (group === "construction") sel.construction = idx === null ? null : catalog.options.construction[idx];
+      else if (group === "fins")    sel.fins         = idx === null ? null : finsRadios[idx];
+      else if (group === "leash")   sel.leash        = idx === null ? null : catalog.options.leash[idx];
+      else if (group === "boardbag")sel.boardbag     = idx === null ? null : catalog.options.boardbag[idx];
+      else if (group === "speciality") sel.speciality = idx === null ? null : catalog.specialities[idx];
+    } else if (input.type === "checkbox") {
+      input.closest(".calc-pill").classList.toggle("active", input.checked);
+      if (group === "deco") {
+        const idx = Number(input.value);
+        if (input.checked) sel.decos.add(idx); else sel.decos.delete(idx);
+      } else if (group === "channels") {
+        sel.channels = input.checked;
+      } else if (group === "pad") {
+        sel.pad = input.checked;
+      }
+    }
+    recompute();
+  });
+
+  detailToggle.addEventListener("click", () => {
+    const hidden = detailEl.classList.toggle("hidden");
+    detailToggle.textContent = hidden ? "▸ Détail du calcul" : "▾ Détail du calcul";
+  });
+
+  function buildFullMessage() {
+    const { total, lines } = buildLines();
+    if (!sel.size) return null;
+    const RULE = "─────────────────────────";
+    return [
+      "Bonjour,",
+      "",
+      "Merci pour votre visite à l'atelier.",
+      "",
+      "Voici pour mémoire l'estimation de prix de votre projet de planche :",
+      "",
+      "────── DEVIS NOTOX ──────",
+      "",
+      ...lines,
+      "",
+      RULE,
+      `TOTAL : ${fmtEuro(total)}`,
+      RULE,
+      "",
+      "Merci pour l'intérêt que vous portez à notre démarche et la qualité de notre travail.",
+      "",
+      "Nous restons à votre entière disposition.",
+      "",
+      "À très bientôt,",
+      "L'équipe NOTOX 🤙",
+    ].join("\n");
+  }
+
+  function openExternalLink(url) {
+    const a = document.createElement("a");
+    a.href = url;
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+
+  copyBtn.addEventListener("click", async () => {
+    const text = buildFullMessage();
+    if (!text) { showToast("⚠ Choisis une taille pour calculer"); return; }
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast("✓ Devis copié");
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy"); showToast("✓ Devis copié"); }
+      catch { showToast("⚠ Copie impossible"); }
+      finally { ta.remove(); }
+    }
+  });
+
+  emailBtn.addEventListener("click", () => {
+    const text = buildFullMessage();
+    if (!text) { showToast("⚠ Choisis une taille pour calculer"); return; }
+    openCalcEmailModal(text);
+  });
+
+  smsBtn.addEventListener("click", () => {
+    const text = buildFullMessage();
+    if (!text) { showToast("⚠ Choisis une taille pour calculer"); return; }
+    // sms:?body=... est compatible iOS et Android modernes
+    openExternalLink(`sms:?&body=${encodeURIComponent(text)}`);
+  });
+
+  recompute();
+}
+
+// Sous-modal de composition email pour le devis. Pas de body-lock supplémentaire :
+// la modal calculatrice parente a déjà verrouillé le scroll body.
+function openCalcEmailModal(prefilledBody) {
+  // Sujet auto-syncé sur l'email du client tant qu'il n'a pas été édité à la main.
+  const SUBJECT_PREFIX = "Devis NOTOX - ";
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal-card" role="dialog" aria-modal="true">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span class="modal-title-icon" aria-hidden="true">📧</span>
+          <span class="modal-title-text"><span>Envoyer le devis</span></span>
+        </div>
+        <button class="modal-close" data-close aria-label="Fermer">×</button>
+      </div>
+      <div class="modal-body">
+        <div>
+          <label class="field-label" for="qm-to">Email du client</label>
+          <input id="qm-to" class="field-input" type="email" placeholder="prenom.nom@exemple.com" autocomplete="email" inputmode="email">
+        </div>
+        <div class="modal-info-banner" style="background:rgba(100,116,139,.14); border-color:rgba(100,116,139,.3); color:var(--text);">
+          📋 En copie automatique : <b>contact@notoxsurf.com</b>
+        </div>
+        <div>
+          <label class="field-label" for="qm-subject">Sujet</label>
+          <input id="qm-subject" class="field-input" type="text" value="${escapeHtml(SUBJECT_PREFIX.trimEnd())}">
+        </div>
+        <div>
+          <label class="field-label" for="qm-body">Message</label>
+          <textarea id="qm-body" class="field-textarea" spellcheck="true" style="min-height:280px;">${escapeHtml(prefilledBody)}</textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-modal-cancel" data-close>Annuler</button>
+        <button class="btn-modal-send" id="qm-send">📨 Envoyer</button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(overlay);
+
+  function close() {
+    overlay.remove();
+    document.removeEventListener("keydown", onKey);
+  }
+  function onKey(e) { if (e.key === "Escape") { close(); e.stopPropagation(); } }
+  document.addEventListener("keydown", onKey);
+  overlay.querySelectorAll("[data-close]").forEach(b => b.addEventListener("click", close));
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
+
+  const toEl      = overlay.querySelector("#qm-to");
+  const subjectEl = overlay.querySelector("#qm-subject");
+  const bodyEl    = overlay.querySelector("#qm-body");
+  const sendBtn   = overlay.querySelector("#qm-send");
+
+  // Auto-sync sujet ← email tant que l'utilisateur n'a pas édité le sujet à la main.
+  let subjectAuto = true;
+  subjectEl.addEventListener("input", () => { subjectAuto = false; });
+  toEl.addEventListener("input", () => {
+    if (!subjectAuto) return;
+    const email = toEl.value.trim();
+    subjectEl.value = email ? SUBJECT_PREFIX + email : SUBJECT_PREFIX.trimEnd();
+  });
+
+  sendBtn.addEventListener("click", async () => {
+    const to      = toEl.value.trim();
+    const subject = subjectEl.value.trim();
+    const body    = bodyEl.value.trim();
+    if (!to)                                          { showToast("⚠ Email destinataire vide"); toEl.focus(); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to))       { showToast("⚠ Email invalide"); toEl.focus(); return; }
+    if (!subject)                                     { showToast("⚠ Sujet vide"); subjectEl.focus(); return; }
+    if (!body)                                        { showToast("⚠ Message vide"); bodyEl.focus(); return; }
+
+    sendBtn.disabled = true;
+    sendBtn.innerHTML = `<span class="spinner-xs"></span> Envoi…`;
+    try {
+      const resp = await fetch(`${CONFIG.backendUrl}/send-quote`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-api-secret": CONFIG.apiSecret },
+        body: JSON.stringify({
+          to,
+          cc: ["contact@notoxsurf.com"],
+          subject,
+          body_text: body,
+        }),
+      });
+      if (!resp.ok) {
+        const txt = await resp.text().catch(() => "");
+        throw new Error(`HTTP ${resp.status}${txt ? " — " + txt.slice(0, 200) : ""}`);
+      }
+      await resp.json().catch(() => ({}));
+      close();
+      showToast("✓ Devis envoyé");
+    } catch (err) {
+      console.error(err);
+      sendBtn.disabled = false;
+      sendBtn.innerHTML = "📨 Envoyer";
+      showToast("⚠ Envoi échoué : " + err.message);
+    }
+  });
+
+  setTimeout(() => toEl?.focus(), 50);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // SUPPLIER CART
 // ══════════════════════════════════════════════════════════════════════════════
 
@@ -2477,6 +3067,9 @@ function renderShell(content) {
   return `
   <header>
     <img src="garybot_logo.png" alt="GaryBot" class="gary-logo" onerror="this.style.display='none'">
+    <button class="calc-btn" type="button" aria-label="Calculateur de prix" title="Calculateur de prix" onclick="openPriceCalculator()">
+      <img src="CALC.png" alt="Calculateur">
+    </button>
     <div class="menu-wrap">
       <button class="hamburger-btn" id="menu-toggle" aria-haspopup="true" aria-expanded="${S.userMenuOpen?"true":"false"}" aria-label="Menu">
         <span></span><span></span><span></span>
