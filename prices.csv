@@ -3,6 +3,8 @@ model;SHORTBOARD;
 model;HYBRID;
 model;MIDLENGTH;
 model;LONGBOARD;
+model;OTHER;
+speciality;SURF;0
 speciality;SURFOIL;400
 speciality;WINGFOIL;800
 speciality;DOWNWIND;1000
