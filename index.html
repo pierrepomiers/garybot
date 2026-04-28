@@ -1645,25 +1645,25 @@ function openPriceCalculator() {
 
 function renderCalcModal(overlay, catalog, close) {
   // Schéma des 11 menus déroulants. 'noneOption' = fournit un <option value="">— Aucun —</option>
-  // en première position. 'size' utilise une placeholder désactivée à la place.
+  // en première position (sélectionnée par défaut). Tous les champs sont optionnels :
+  // un devis pour accessoires seuls (sans planche) doit pouvoir partir sans taille ni modèle.
   const FIELDS = [
-    { key: "model",          label: "Modèle",           noneOption: false, showPrice: false },
-    { key: "size",           label: "Taille",           noneOption: false, showPrice: true, required: true },
-    { key: "construction",   label: "Construction",     noneOption: true,  showPrice: true },
-    { key: "shape options",  label: "Options de shape", noneOption: true,  showPrice: true },
-    { key: "fins setup",     label: "Setup de dérives", noneOption: true,  showPrice: true },
-    { key: "deco",           label: "Déco",             noneOption: true,  showPrice: true },
-    { key: "leash",          label: "Leash",            noneOption: true,  showPrice: true },
-    { key: "fins",           label: "Dérives",          noneOption: true,  showPrice: true },
-    { key: "boardbag",       label: "Housse",           noneOption: true,  showPrice: true },
-    { key: "pad",            label: "Pad arrière",      noneOption: true,  showPrice: true },
-    { key: "speciality",     label: "Spécialité",       noneOption: true,  showPrice: true },
+    { key: "model",          label: "Modèle",           noneOption: true, showPrice: false },
+    { key: "size",           label: "Taille",           noneOption: true, showPrice: true  },
+    { key: "construction",   label: "Construction",     noneOption: true, showPrice: true  },
+    { key: "shape options",  label: "Options de shape", noneOption: true, showPrice: true  },
+    { key: "fins setup",     label: "Setup de dérives", noneOption: true, showPrice: true  },
+    { key: "deco",           label: "Déco",             noneOption: true, showPrice: true  },
+    { key: "leash",          label: "Leash",            noneOption: true, showPrice: true  },
+    { key: "fins",           label: "Dérives",          noneOption: true, showPrice: true  },
+    { key: "boardbag",       label: "Housse",           noneOption: true, showPrice: true  },
+    { key: "pad",            label: "Pad arrière",      noneOption: true, showPrice: true  },
+    { key: "speciality",     label: "Spécialité",       noneOption: true, showPrice: true  },
   ];
 
-  // État : pour chaque field.key, l'item sélectionné ou null.
-  // Le 1er modèle est sélectionné par défaut (model n'a pas d'option Aucun).
+  // État : pour chaque field.key, l'item sélectionné ou null. Tout démarre à null
+  // (l'option « Aucun » de chaque <select> est sélectionnée par défaut côté DOM).
   const sel = Object.fromEntries(FIELDS.map(f => [f.key, null]));
-  if ((catalog.model || []).length > 0) sel.model = catalog.model[0];
 
   const card = overlay.querySelector(".modal-card");
   const oldBody = card.querySelector("#calc-body");
@@ -1676,12 +1676,8 @@ function renderCalcModal(overlay, catalog, close) {
       const labelTxt = field.showPrice && it.price != null
         ? `${it.name} — ${fmtEuro(it.price)}`
         : it.name;
-      const selected = field.key === "model" && i === 0 ? " selected" : "";
-      return `<option value="${i}"${selected}>${escapeHtml(labelTxt)}</option>`;
+      return `<option value="${i}">${escapeHtml(labelTxt)}</option>`;
     }).join("");
-    if (field.key === "size") {
-      return `<option value="" disabled selected>— Choisir une taille —</option>${opts}`;
-    }
     if (field.noneOption) {
       return `<option value="">— Aucun —</option>${opts}`;
     }
@@ -1692,7 +1688,7 @@ function renderCalcModal(overlay, catalog, close) {
     <div class="modal-body" id="calc-body">
       ${FIELDS.map(f => `
       <div class="calc-section">
-        <label class="field-label" for="${fieldId(f.key)}">${escapeHtml(f.label)}${f.required ? " *" : ""}</label>
+        <label class="field-label" for="${fieldId(f.key)}">${escapeHtml(f.label)}</label>
         <select id="${fieldId(f.key)}" class="calc-select" data-field="${escapeHtml(f.key)}">
           ${renderOptions(f)}
         </select>
@@ -1730,7 +1726,6 @@ function renderCalcModal(overlay, catalog, close) {
   card.querySelectorAll("[data-close]").forEach(b => b.addEventListener("click", close));
 
   // Construit les lignes du devis : uniquement les champs sélectionnés (non « Aucun »).
-  // Le total reste à null tant que la taille n'est pas choisie (affiché « — »).
   function buildLines() {
     const lines = [];
     let total = 0;
@@ -1744,16 +1739,20 @@ function renderCalcModal(overlay, catalog, close) {
         lines.push(`${f.label} : ${item.name}`);
       }
     }
-    return { total, lines, hasSize: !!sel.size };
+    return { total, lines };
   }
 
   function recompute() {
-    const { total, lines, hasSize } = buildLines();
-    totalEl.textContent = hasSize ? fmtEuro(total) : "—";
+    const { total, lines } = buildLines();
+    const hasTotal = total > 0;
+    totalEl.textContent = hasTotal ? fmtEuro(total) : "—";
     detailEl.textContent = lines.length
-      ? lines.join("\n") + (hasSize ? "\n─────────────\nTOTAL : " + fmtEuro(total) : "")
+      ? lines.join("\n") + (hasTotal ? "\n─────────────\nTOTAL : " + fmtEuro(total) : "")
       : "Aucune sélection";
-    return { total, lines, hasSize };
+    copyBtn.disabled  = !hasTotal;
+    emailBtn.disabled = !hasTotal;
+    smsBtn.disabled   = !hasTotal;
+    return { total, lines, hasTotal };
   }
 
   // Event delegation : tous les <select> du body remontent ici.
@@ -1775,7 +1774,7 @@ function renderCalcModal(overlay, catalog, close) {
   // Vide → pas de ligne « Vos coordonnées » (cas copier/SMS où l'email n'est pas connu).
   function buildFullMessage(coordsLine = "") {
     const { total, lines } = buildLines();
-    if (!sel.size) return null;
+    if (total <= 0) return null;
     const RULE = "─────────────────────────";
     const out = [
       "Bonjour,",
@@ -1811,7 +1810,7 @@ function renderCalcModal(overlay, catalog, close) {
 
   copyBtn.addEventListener("click", async () => {
     const text = buildFullMessage();
-    if (!text) { showToast("⚠ Choisis une taille pour calculer"); return; }
+    if (!text) return; // bouton désactivé tant que total <= 0
     try {
       await navigator.clipboard.writeText(text);
       showToast("✓ Devis copié");
@@ -1826,7 +1825,7 @@ function renderCalcModal(overlay, catalog, close) {
   });
 
   emailBtn.addEventListener("click", () => {
-    if (!sel.size) { showToast("⚠ Choisis une taille pour calculer"); return; }
+    if (buildFullMessage() === null) return; // bouton désactivé tant que total <= 0
     // On passe la fonction (et non le texte pré-construit) pour pouvoir
     // re-générer le body avec la ligne « Vos coordonnées » dès que l'email
     // ou le téléphone change dans la sous-modal.
@@ -1835,7 +1834,7 @@ function renderCalcModal(overlay, catalog, close) {
 
   smsBtn.addEventListener("click", () => {
     const text = buildFullMessage();
-    if (!text) { showToast("⚠ Choisis une taille pour calculer"); return; }
+    if (!text) return; // bouton désactivé tant que total <= 0
     // sms:?body=... est compatible iOS et Android modernes
     openExternalLink(`sms:?&body=${encodeURIComponent(text)}`);
   });
