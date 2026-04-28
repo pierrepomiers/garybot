@@ -1,91 +1,131 @@
-type,category,name,price
-model,,SHORTBOARD,
-model,,HYBRID,
-model,,MIDLENGTH,
-model,,LONGBOARD,
-model,,OTHER,
-size,,5'2,820
-size,,5'3,820
-size,,5'4,830
-size,,5'5,840
-size,,5'6,850
-size,,5'7,860
-size,,5'8,870
-size,,5'9,880
-size,,5'10,900
-size,,5'11,910
-size,,6'0,920
-size,,6'1,930
-size,,6'2,940
-size,,6'3,950
-size,,6'4,960
-size,,6'5,970
-size,,6'6,990
-size,,6'7,1000
-size,,6'8,1010
-size,,6'9,1020
-size,,6'10,1030
-size,,6'11,1040
-size,,7'0,1050
-size,,7'1,1060
-size,,7'2,1070
-size,,7'3,1080
-size,,7'4,1100
-size,,7'5,1110
-size,,7'6,1120
-size,,7'7,1130
-size,,7'8,1140
-size,,7'9,1150
-size,,7'10,1170
-size,,7'11,1180
-size,,8'0,1190
-size,,8'1,1200
-size,,8'2,1210
-size,,8'3,1220
-size,,8'4,1240
-size,,8'5,1250
-size,,8'6,1260
-size,,8'7,1270
-size,,8'8,1280
-size,,8'9,1290
-size,,8'10,1310
-size,,8'11,1320
-size,,9'0,1320
-size,,9'1,1330
-size,,9'2,1350
-size,,9'3,1360
-size,,9'4,1370
-size,,9'5,1380
-size,,9'6,1390
-option,construction,KORKO,100
-option,construction,GREENONE,150
-option,construction,GREENFLX,250
-option,construction,R-CARBON,400
-option,construction,BLACKFLX,650
-option,deco,DECO SB,80
-option,deco,DECO ML,120
-option,deco,DECO LB,200
-option,fins,CHANNELS,90
-option,fins,TWIN,0
-option,fins,3 FINS,0
-option,fins,4 FINS,20
-option,fins,5 FINS,30
-option,fins,2+1 US,0
-option,fins,4+1 US,30
-option,fins,1 US,0
-option,leash,LEASH 6'',30
-option,leash,LEASH 7'',31
-option,leash,LEASH 8'',32
-option,leash,LEASH 9'',34
-option,boardbag,BORDBAG 6',87
-option,boardbag,BOARDBG 6'7,89
-option,boardbag,BOARDBAG 7',90
-option,boardbag,BOARDBG 7'6,93
-option,boardbag,BOARDBG 8'',95
-option,boardbag,BOARDBAG 9',114
-option,pad,PAD ARRIERE,48
-speciality,,SURFOIL,400
-speciality,,WINGFOIL,800
-speciality,,DOWNWIND,1000
-speciality,,SUP,500
-speciality,,SUPFOIL,1500
+﻿type;name;price
+model;SHORTBOARD;
+model;HYBRID;
+model;MIDLENGTH;
+model;LONGBOARD;
+model;OTHER;
+size;4'0;820
+size;4'1;820
+size;4'2;820
+size;4'3;820
+size;4'4;820
+size;4'5;820
+size;4'6;820
+size;4'7;820
+size;4'8;820
+size;4'9;820
+size;4'10;820
+size;4'11;820
+size;5'0;820
+size;5'1;820
+size;5'2;820
+size;5'3;820
+size;5'4;830
+size;5'5;840
+size;5'6;850
+size;5'7;860
+size;5'8;870
+size;5'9;880
+size;5'10;900
+size;5'11;910
+size;6'0;920
+size;6'1;930
+size;6'2;950
+size;6'3;960
+size;6'4;970
+size;6'5;980
+size;6'6;990
+size;6'7;1000
+size;6'8;1010
+size;6'9;1030
+size;6'10;1040
+size;6'11;1050
+size;7'0;1060
+size;7'1;1070
+size;7'2;1080
+size;7'3;1090
+size;7'4;1110
+size;7'5;1120
+size;7'6;1130
+size;7'7;1140
+size;7'8;1150
+size;7'9;1160
+size;7'10;1170
+size;7'11;1190
+size;8'0;1200
+size;8'1;1210
+size;8'2;1220
+size;8'3;1230
+size;8'4;1240
+size;8'5;1250
+size;8'6;1270
+size;8'7;1280
+size;8'8;1290
+size;8'9;1300
+size;8'10;1310
+size;8'11;1320
+size;9'0;1330
+size;9'1;1350
+size;9'2;1360
+size;9'3;1370
+size;9'4;1380
+size;9'5;1390
+size;9'6;1400
+size;9'7;1410
+size;9'8;1430
+size;9'9;1440
+size;9'10;1450
+size;9'11;1460
+size;10'0;1470
+size;10'1;1480
+size;10'2;1490
+size;10'3;1510
+size;10'4;1520
+size;10'5;1530
+size;10'6;1540
+size;10'7;1550
+size;10'8;1560
+size;10'9;1570
+size;10'10;1590
+size;10'11;1600
+construction;KORKO;100
+construction;GREENONE;150
+construction;GREENFLX;250
+construction;R-CARBON;400
+construction;BLACKFLX;650
+shape options;2 x CHANNELS;60
+shape options;4 x CHANNELS;90
+shape options;WINGS;60
+fins setup;CHANNELS;90
+fins setup;TWIN;0
+fins setup;3 FINS;0
+fins setup;4 FINS;20
+fins setup;5 FINS;30
+fins setup;2+1 US;0
+fins setup;4+1 US;30
+fins setup;1 US;0
+deco;DECO SB;80
+deco;DECO ML;120
+deco;DECO LB;200
+leash;LEASH 6';30
+leash;LEASH 7';31
+leash;LEASH 8';32
+leash;LEASH 9';34
+fins;3 FUTURES ALPHA;78
+fins;5 FUTURES ALPHA;108
+fins;3 FUTURES/FCS2 FIBRE;138
+fins;5 FUTURES/FCS2 FIBRE;200
+boardbag;BORDBAG 6';87
+boardbag;BOARDBG 6'7;89
+boardbag;BOARDBAG 7';90
+boardbag;BOARDBG 7'6;93
+boardbag;BOARDBG 8';95
+boardbag;BOARDBAG 9';114
+pad;PAD ARRIERE;48
+speciality;SURFOIL;400
+speciality;WINGFOIL;800
+speciality;DOWNWIND;1000
+speciality;SUP;500
+speciality;SUPFOIL;1500
+speciality;RESCUE;1500
+speciality;RACE PADDLE;1500

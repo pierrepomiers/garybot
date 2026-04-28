@@ -440,24 +440,6 @@ header {
   background-size:5px 5px, 5px 5px; background-repeat:no-repeat; padding-right:34px;
 }
 .calc-select:focus { border-color:rgba(59,130,246,.45); }
-.calc-grid {
-  display:grid; grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); gap:6px;
-}
-.calc-pill {
-  display:flex; align-items:center; justify-content:space-between; gap:6px;
-  background:var(--bg3); border:1px solid var(--border); color:var(--text);
-  padding:9px 10px; border-radius:8px; font-size:13px; cursor:pointer;
-  transition:border-color .15s, background .15s;
-  user-select:none;
-}
-.calc-pill input { display:none; }
-.calc-pill:hover { border-color:rgba(59,130,246,.35); }
-.calc-pill .calc-pill-name { font-family:var(--mono); font-size:12px; letter-spacing:.02em; }
-.calc-pill .calc-pill-price { color:var(--muted); font-family:var(--mono); font-size:11px; flex-shrink:0; }
-.calc-pill.active {
-  background:rgba(59,130,246,.18); border-color:rgba(59,130,246,.55); color:#dbeafe;
-}
-.calc-pill.active .calc-pill-price { color:#bfdbfe; }
 .calc-total-bar {
   display:flex; align-items:center; justify-content:space-between; gap:10px;
   padding:10px 14px; background:rgba(59,130,246,.1); border-radius:10px;
@@ -1453,6 +1435,10 @@ function openClientMessageModal(order, stepLabel, stepId, progress) {
       <div class="modal-body">
         ${lastSentBanner}
         <div>
+          <label class="field-label" for="msg-phone">Téléphone client</label>
+          <input id="msg-phone" class="field-input" type="tel" inputmode="tel" placeholder="06 12 34 56 78" autocomplete="tel">
+        </div>
+        <div>
           <label class="field-label" for="msg-subject">Sujet</label>
           <input id="msg-subject" class="field-input" type="text" value="${escapeHtml(subject)}">
         </div>
@@ -1483,6 +1469,7 @@ function openClientMessageModal(order, stepLabel, stepId, progress) {
   const sendBtn   = overlay.querySelector("#msg-send");
   const subjectEl = overlay.querySelector("#msg-subject");
   const bodyEl    = overlay.querySelector("#msg-body");
+  const phoneEl   = overlay.querySelector("#msg-phone");
 
   function renderThumbs() {
     const full = photos.length >= MAX_PHOTOS;
@@ -1532,7 +1519,9 @@ function openClientMessageModal(order, stepLabel, stepId, progress) {
   sendBtn.addEventListener("click", async () => {
     const subjectVal = subjectEl.value.trim();
     const bodyVal = bodyEl.value.trim();
+    const phoneVal = phoneEl.value.trim();
     if (!bodyVal) { showToast("⚠ Message vide"); return; }
+    const finalSubject = phoneVal ? `${subjectVal} — ${phoneVal}` : subjectVal;
 
     sendBtn.disabled = true;
     sendBtn.innerHTML = `<span class="spinner-xs"></span> Envoi…`;
@@ -1541,7 +1530,7 @@ function openClientMessageModal(order, stepLabel, stepId, progress) {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-api-secret": CONFIG.apiSecret },
         body: JSON.stringify({
-          subject: subjectVal,
+          subject: finalSubject,
           body: bodyVal,
           partner_id: partnerId,
           attachments: photos.map(p => ({ name: p.name, data: p.data })),
@@ -1573,41 +1562,34 @@ function openClientMessageModal(order, stepLabel, stepId, progress) {
 // PRICE CALCULATOR (prices.csv → modal calcul)
 // ══════════════════════════════════════════════════════════════════════════════
 
+// CSV : séparateur ';', 3 colonnes (type;name;price), BOM UTF-8 toléré en tête.
 function parsePriceCsv(text) {
-  // Format simple : type,category,name,price (pas de virgule dans les valeurs).
+  if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
   const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
   if (lines.length === 0) return [];
   lines.shift(); // header
   const rows = [];
   for (const line of lines) {
-    const cols = line.split(",");
-    if (cols.length < 4) continue;
+    const cols = line.split(";");
+    if (cols.length < 3) continue;
     const type     = (cols[0] || "").trim();
-    const category = (cols[1] || "").trim();
-    const name     = (cols[2] || "").trim();
-    const priceRaw = (cols[3] || "").trim();
+    const name     = (cols[1] || "").trim();
+    const priceRaw = (cols[2] || "").trim();
     rows.push({
-      type, category, name,
+      type, name,
       price: priceRaw === "" ? null : Number(priceRaw),
     });
   }
   return rows;
 }
 
+// Catalogue indexé par type (clé = valeur exacte de la 1ère colonne du CSV),
+// l'ordre du CSV est préservé dans chaque tableau.
 function buildPriceCatalog(rows) {
-  const cat = {
-    models: [],
-    sizes: [],
-    options: { construction: [], deco: [], fins: [], leash: [], boardbag: [], pad: [] },
-    specialities: [],
-  };
+  const cat = {};
   for (const r of rows) {
-    if (r.type === "model") cat.models.push({ name: r.name });
-    else if (r.type === "size") cat.sizes.push({ name: r.name, price: r.price });
-    else if (r.type === "option" && cat.options[r.category]) {
-      cat.options[r.category].push({ name: r.name, price: r.price });
-    }
-    else if (r.type === "speciality") cat.specialities.push({ name: r.name, price: r.price });
+    if (!cat[r.type]) cat[r.type] = [];
+    cat[r.type].push({ name: r.name, price: r.price });
   }
   return cat;
 }
@@ -1669,120 +1651,59 @@ function openPriceCalculator() {
 }
 
 function renderCalcModal(overlay, catalog, close) {
-  // CHANNELS = checkbox additionnelle, autres fins = radios.
-  const finsRadios = catalog.options.fins.filter(o => o.name !== "CHANNELS");
-  const channelsOpt = catalog.options.fins.find(o => o.name === "CHANNELS") || null;
-  const padOpt = catalog.options.pad[0] || null;
+  // Schéma des 11 menus déroulants. 'noneOption' = fournit un <option value="">— Aucun —</option>
+  // en première position. 'size' utilise une placeholder désactivée à la place.
+  const FIELDS = [
+    { key: "model",          label: "Modèle",           noneOption: false, showPrice: false },
+    { key: "size",           label: "Taille",           noneOption: false, showPrice: true, required: true },
+    { key: "construction",   label: "Construction",     noneOption: true,  showPrice: true },
+    { key: "shape options",  label: "Options de shape", noneOption: true,  showPrice: true },
+    { key: "fins setup",     label: "Setup de dérives", noneOption: true,  showPrice: true },
+    { key: "deco",           label: "Déco",             noneOption: true,  showPrice: true },
+    { key: "leash",          label: "Leash",            noneOption: true,  showPrice: true },
+    { key: "fins",           label: "Dérives",          noneOption: true,  showPrice: true },
+    { key: "boardbag",       label: "Housse",           noneOption: true,  showPrice: true },
+    { key: "pad",            label: "Pad arrière",      noneOption: true,  showPrice: true },
+    { key: "speciality",     label: "Spécialité",       noneOption: true,  showPrice: true },
+  ];
 
-  const sel = {
-    model: catalog.models[0]?.name || null,
-    size: null,
-    construction: null,
-    decos: new Set(),     // indices dans catalog.options.deco
-    fins: null,
-    channels: false,
-    leash: null,
-    boardbag: null,
-    pad: false,
-    speciality: null,
-  };
+  // État : pour chaque field.key, l'item sélectionné ou null.
+  // Le 1er modèle est sélectionné par défaut (model n'a pas d'option Aucun).
+  const sel = Object.fromEntries(FIELDS.map(f => [f.key, null]));
+  if ((catalog.model || []).length > 0) sel.model = catalog.model[0];
 
   const card = overlay.querySelector(".modal-card");
   const oldBody = card.querySelector("#calc-body");
 
-  const pillRadio = (group, idx, label, price) => `
-    <label class="calc-pill">
-      <input type="radio" name="calc-${group}" value="${idx}">
-      <span class="calc-pill-name">${escapeHtml(label)}</span>
-      <span class="calc-pill-price">${price === 0 ? "0 €" : "+" + fmtEuro(price)}</span>
-    </label>`;
-  const pillCheckbox = (group, idx, label, price) => `
-    <label class="calc-pill">
-      <input type="checkbox" name="calc-${group}" value="${idx}">
-      <span class="calc-pill-name">${escapeHtml(label)}</span>
-      <span class="calc-pill-price">+${fmtEuro(price)}</span>
-    </label>`;
-  const pillNone = (group) => `
-    <label class="calc-pill"><input type="radio" name="calc-${group}" value="" checked>
-      <span class="calc-pill-name">Aucune</span>
-      <span class="calc-pill-price">0 €</span>
-    </label>`;
+  const fieldId = (key) => `calc-${key.replace(/\s+/g, "-")}`;
+
+  const renderOptions = (field) => {
+    const items = catalog[field.key] || [];
+    const opts = items.map((it, i) => {
+      const labelTxt = field.showPrice && it.price != null
+        ? `${it.name} — ${fmtEuro(it.price)}`
+        : it.name;
+      const selected = field.key === "model" && i === 0 ? " selected" : "";
+      return `<option value="${i}"${selected}>${escapeHtml(labelTxt)}</option>`;
+    }).join("");
+    if (field.key === "size") {
+      return `<option value="" disabled selected>— Choisir une taille —</option>${opts}`;
+    }
+    if (field.noneOption) {
+      return `<option value="">— Aucun —</option>${opts}`;
+    }
+    return opts;
+  };
 
   oldBody.outerHTML = `
     <div class="modal-body" id="calc-body">
+      ${FIELDS.map(f => `
       <div class="calc-section">
-        <label class="field-label" for="calc-model">Modèle</label>
-        <select id="calc-model" class="calc-select">
-          ${catalog.models.map(m => `<option value="${escapeHtml(m.name)}">${escapeHtml(m.name)}</option>`).join("")}
+        <label class="field-label" for="${fieldId(f.key)}">${escapeHtml(f.label)}${f.required ? " *" : ""}</label>
+        <select id="${fieldId(f.key)}" class="calc-select" data-field="${escapeHtml(f.key)}">
+          ${renderOptions(f)}
         </select>
-      </div>
-
-      <div class="calc-section">
-        <label class="field-label" for="calc-size">Taille *</label>
-        <select id="calc-size" class="calc-select">
-          <option value="">— Choisir une taille —</option>
-          ${catalog.sizes.map((s, i) => `<option value="${i}">${escapeHtml(s.name)} — ${fmtEuro(s.price)}</option>`).join("")}
-        </select>
-      </div>
-
-      <div class="calc-section">
-        <label class="field-label">Construction</label>
-        <div class="calc-grid" data-group="construction">
-          ${pillNone("construction")}
-          ${catalog.options.construction.map((o, i) => pillRadio("construction", i, o.name, o.price)).join("")}
-        </div>
-      </div>
-
-      <div class="calc-section">
-        <label class="field-label">Déco</label>
-        <div class="calc-grid" data-group="deco">
-          ${catalog.options.deco.map((o, i) => pillCheckbox("deco", i, o.name, o.price)).join("")}
-        </div>
-      </div>
-
-      <div class="calc-section">
-        <label class="field-label">Setup fins</label>
-        <div class="calc-grid" data-group="fins">
-          ${pillNone("fins")}
-          ${finsRadios.map((o, i) => pillRadio("fins", i, o.name, o.price)).join("")}
-        </div>
-        ${channelsOpt ? `
-        <div class="calc-grid" data-group="channels" style="margin-top:6px;">
-          ${pillCheckbox("channels", 0, channelsOpt.name, channelsOpt.price)}
-        </div>` : ""}
-      </div>
-
-      <div class="calc-section">
-        <label class="field-label">Leash</label>
-        <div class="calc-grid" data-group="leash">
-          ${pillNone("leash")}
-          ${catalog.options.leash.map((o, i) => pillRadio("leash", i, o.name, o.price)).join("")}
-        </div>
-      </div>
-
-      <div class="calc-section">
-        <label class="field-label">Boardbag</label>
-        <div class="calc-grid" data-group="boardbag">
-          ${pillNone("boardbag")}
-          ${catalog.options.boardbag.map((o, i) => pillRadio("boardbag", i, o.name, o.price)).join("")}
-        </div>
-      </div>
-
-      ${padOpt ? `
-      <div class="calc-section">
-        <label class="field-label">Accessoires</label>
-        <div class="calc-grid" data-group="pad">
-          ${pillCheckbox("pad", 0, padOpt.name, padOpt.price)}
-        </div>
-      </div>` : ""}
-
-      <div class="calc-section">
-        <label class="field-label">Speciality</label>
-        <div class="calc-grid" data-group="speciality">
-          ${pillNone("speciality")}
-          ${catalog.specialities.map((o, i) => pillRadio("speciality", i, o.name, o.price)).join("")}
-        </div>
-      </div>
+      </div>`).join("")}
 
       <div>
         <button type="button" class="calc-detail-toggle" id="calc-detail-toggle">▸ Détail du calcul</button>
@@ -1795,7 +1716,7 @@ function renderCalcModal(overlay, catalog, close) {
     <div class="modal-footer" style="flex-direction:column; gap:8px;">
       <div class="calc-total-bar" style="width:100%;">
         <span class="calc-total-label">Total</span>
-        <span class="calc-total-value" id="calc-total">0 €</span>
+        <span class="calc-total-value" id="calc-total">—</span>
       </div>
       <div style="display:flex; gap:8px; width:100%;">
         <button class="btn-modal-send btn-calc-copy" id="calc-copy" style="flex:1;">📋 Copier</button>
@@ -1811,100 +1732,44 @@ function renderCalcModal(overlay, catalog, close) {
   const copyBtn      = card.querySelector("#calc-copy");
   const emailBtn     = card.querySelector("#calc-email");
   const smsBtn       = card.querySelector("#calc-sms");
-  const modelSelect  = card.querySelector("#calc-model");
-  const sizeSelect   = card.querySelector("#calc-size");
 
   // Re-bind close sur les boutons ajoutés après render
   card.querySelectorAll("[data-close]").forEach(b => b.addEventListener("click", close));
 
+  // Construit les lignes du devis : uniquement les champs sélectionnés (non « Aucun »).
+  // Le total reste à null tant que la taille n'est pas choisie (affiché « — »).
   function buildLines() {
     const lines = [];
     let total = 0;
-    if (sel.model) lines.push(`Modèle : ${sel.model}`);
-    if (sel.size) {
-      total += sel.size.price;
-      lines.push(`Taille : ${sel.size.name} — ${fmtEuro(sel.size.price)}`);
-    }
-    if (sel.construction) {
-      total += sel.construction.price;
-      lines.push(`Construction : ${sel.construction.name} — ${fmtEuro(sel.construction.price)}`);
-    }
-    catalog.options.deco.forEach((d, i) => {
-      if (sel.decos.has(i)) {
-        total += d.price;
-        lines.push(`Déco : ${d.name} — ${fmtEuro(d.price)}`);
+    for (const f of FIELDS) {
+      const item = sel[f.key];
+      if (!item) continue;
+      if (item.price != null) {
+        total += item.price;
+        lines.push(`${f.label} : ${item.name} — ${fmtEuro(item.price)}`);
+      } else {
+        lines.push(`${f.label} : ${item.name}`);
       }
-    });
-    if (sel.fins) {
-      total += sel.fins.price;
-      lines.push(`Setup : ${sel.fins.name} — ${fmtEuro(sel.fins.price)}`);
     }
-    if (sel.channels && channelsOpt) {
-      total += channelsOpt.price;
-      lines.push(`${channelsOpt.name} — ${fmtEuro(channelsOpt.price)}`);
-    }
-    if (sel.leash) {
-      total += sel.leash.price;
-      lines.push(`Leash : ${sel.leash.name} — ${fmtEuro(sel.leash.price)}`);
-    }
-    if (sel.boardbag) {
-      total += sel.boardbag.price;
-      lines.push(`Boardbag : ${sel.boardbag.name} — ${fmtEuro(sel.boardbag.price)}`);
-    }
-    if (sel.pad && padOpt) {
-      total += padOpt.price;
-      lines.push(`Pad arrière — ${fmtEuro(padOpt.price)}`);
-    }
-    if (sel.speciality) {
-      total += sel.speciality.price;
-      lines.push(`Speciality : ${sel.speciality.name} — ${fmtEuro(sel.speciality.price)}`);
-    }
-    return { total, lines };
+    return { total, lines, hasSize: !!sel.size };
   }
 
   function recompute() {
-    const { total, lines } = buildLines();
-    totalEl.textContent = fmtEuro(total);
+    const { total, lines, hasSize } = buildLines();
+    totalEl.textContent = hasSize ? fmtEuro(total) : "—";
     detailEl.textContent = lines.length
-      ? lines.join("\n") + "\n─────────────\nTOTAL : " + fmtEuro(total)
+      ? lines.join("\n") + (hasSize ? "\n─────────────\nTOTAL : " + fmtEuro(total) : "")
       : "Aucune sélection";
-    return { total, lines };
+    return { total, lines, hasSize };
   }
 
-  modelSelect.addEventListener("change", () => { sel.model = modelSelect.value || null; recompute(); });
-  sizeSelect.addEventListener("change", () => {
-    const v = sizeSelect.value;
-    sel.size = v === "" ? null : catalog.sizes[Number(v)];
-    recompute();
-  });
-
+  // Event delegation : tous les <select> du body remontent ici.
   body.addEventListener("change", (e) => {
-    const input = e.target;
-    if (!input || input.tagName !== "INPUT") return;
-    const groupEl = input.closest("[data-group]");
-    if (!groupEl) return;
-    const group = groupEl.dataset.group;
-
-    if (input.type === "radio") {
-      groupEl.querySelectorAll(".calc-pill").forEach(p => p.classList.remove("active"));
-      if (input.value !== "") input.closest(".calc-pill").classList.add("active");
-      const idx = input.value === "" ? null : Number(input.value);
-      if (group === "construction") sel.construction = idx === null ? null : catalog.options.construction[idx];
-      else if (group === "fins")    sel.fins         = idx === null ? null : finsRadios[idx];
-      else if (group === "leash")   sel.leash        = idx === null ? null : catalog.options.leash[idx];
-      else if (group === "boardbag")sel.boardbag     = idx === null ? null : catalog.options.boardbag[idx];
-      else if (group === "speciality") sel.speciality = idx === null ? null : catalog.specialities[idx];
-    } else if (input.type === "checkbox") {
-      input.closest(".calc-pill").classList.toggle("active", input.checked);
-      if (group === "deco") {
-        const idx = Number(input.value);
-        if (input.checked) sel.decos.add(idx); else sel.decos.delete(idx);
-      } else if (group === "channels") {
-        sel.channels = input.checked;
-      } else if (group === "pad") {
-        sel.pad = input.checked;
-      }
-    }
+    const selectEl = e.target;
+    if (!selectEl || selectEl.tagName !== "SELECT" || !selectEl.dataset.field) return;
+    const key = selectEl.dataset.field;
+    const v = selectEl.value;
+    sel[key] = v === "" ? null : (catalog[key] || [])[Number(v)] || null;
     recompute();
   });
 
