@@ -1587,13 +1587,13 @@ function buildPriceCatalog(rows) {
   return cat;
 }
 
+// Pas de cache applicatif : re-fetch + re-parse à chaque ouverture du calculateur,
+// pour que toute modif de prices.csv soit prise en compte sans hard reload.
 async function loadPriceCatalog() {
-  if (window.PRICES_DATA) return window.PRICES_DATA;
   const resp = await fetch(`./prices.csv?v=${Date.now()}`);
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
   const text = await resp.text();
-  window.PRICES_DATA = buildPriceCatalog(parsePriceCsv(text));
-  return window.PRICES_DATA;
+  return buildPriceCatalog(parsePriceCsv(text));
 }
 
 function fmtEuro(n) {
