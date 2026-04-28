@@ -1435,10 +1435,6 @@ function openClientMessageModal(order, stepLabel, stepId, progress) {
       <div class="modal-body">
         ${lastSentBanner}
         <div>
-          <label class="field-label" for="msg-phone">Téléphone client</label>
-          <input id="msg-phone" class="field-input" type="tel" inputmode="tel" placeholder="06 12 34 56 78" autocomplete="tel">
-        </div>
-        <div>
           <label class="field-label" for="msg-subject">Sujet</label>
           <input id="msg-subject" class="field-input" type="text" value="${escapeHtml(subject)}">
         </div>
@@ -1469,7 +1465,6 @@ function openClientMessageModal(order, stepLabel, stepId, progress) {
   const sendBtn   = overlay.querySelector("#msg-send");
   const subjectEl = overlay.querySelector("#msg-subject");
   const bodyEl    = overlay.querySelector("#msg-body");
-  const phoneEl   = overlay.querySelector("#msg-phone");
 
   function renderThumbs() {
     const full = photos.length >= MAX_PHOTOS;
@@ -1519,9 +1514,7 @@ function openClientMessageModal(order, stepLabel, stepId, progress) {
   sendBtn.addEventListener("click", async () => {
     const subjectVal = subjectEl.value.trim();
     const bodyVal = bodyEl.value.trim();
-    const phoneVal = phoneEl.value.trim();
     if (!bodyVal) { showToast("⚠ Message vide"); return; }
-    const finalSubject = phoneVal ? `${subjectVal} — ${phoneVal}` : subjectVal;
 
     sendBtn.disabled = true;
     sendBtn.innerHTML = `<span class="spinner-xs"></span> Envoi…`;
@@ -1530,7 +1523,7 @@ function openClientMessageModal(order, stepLabel, stepId, progress) {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-api-secret": CONFIG.apiSecret },
         body: JSON.stringify({
-          subject: finalSubject,
+          subject: subjectVal,
           body: bodyVal,
           partner_id: partnerId,
           attachments: photos.map(p => ({ name: p.name, data: p.data })),
@@ -1872,6 +1865,10 @@ function openCalcEmailModal(prefilledBody) {
           📋 En copie automatique : <b>contact@notoxsurf.com</b>
         </div>
         <div>
+          <label class="field-label" for="qm-phone">Téléphone client</label>
+          <input id="qm-phone" class="field-input" type="tel" inputmode="tel" placeholder="06 12 34 56 78" autocomplete="tel">
+        </div>
+        <div>
           <label class="field-label" for="qm-subject">Sujet</label>
           <input id="qm-subject" class="field-input" type="text" value="${escapeHtml(SUBJECT_PREFIX.trimEnd())}">
         </div>
@@ -1898,6 +1895,7 @@ function openCalcEmailModal(prefilledBody) {
   overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
 
   const toEl      = overlay.querySelector("#qm-to");
+  const phoneEl   = overlay.querySelector("#qm-phone");
   const subjectEl = overlay.querySelector("#qm-subject");
   const bodyEl    = overlay.querySelector("#qm-body");
   const sendBtn   = overlay.querySelector("#qm-send");
@@ -1915,10 +1913,12 @@ function openCalcEmailModal(prefilledBody) {
     const to      = toEl.value.trim();
     const subject = subjectEl.value.trim();
     const body    = bodyEl.value.trim();
+    const phone   = phoneEl.value.trim();
     if (!to)                                          { showToast("⚠ Email destinataire vide"); toEl.focus(); return; }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to))       { showToast("⚠ Email invalide"); toEl.focus(); return; }
     if (!subject)                                     { showToast("⚠ Sujet vide"); subjectEl.focus(); return; }
     if (!body)                                        { showToast("⚠ Message vide"); bodyEl.focus(); return; }
+    const finalSubject = phone ? `${subject} — ${phone}` : subject;
 
     sendBtn.disabled = true;
     sendBtn.innerHTML = `<span class="spinner-xs"></span> Envoi…`;
@@ -1929,7 +1929,7 @@ function openCalcEmailModal(prefilledBody) {
         body: JSON.stringify({
           to,
           cc: ["contact@notoxsurf.com"],
-          subject,
+          subject: finalSubject,
           body_text: body,
         }),
       });
