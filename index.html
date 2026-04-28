@@ -1778,20 +1778,15 @@ function renderCalcModal(overlay, catalog, close) {
     return [
       "Bonjour,",
       "",
-      "Merci pour votre visite à l'atelier.",
-      "",
-      "Voici pour mémoire l'estimation de prix de votre projet de planche :",
+      "Merci pour votre visite à l'atelier. Voici pour mémoire l'estimation de prix de votre projet de planche :",
       "",
       "────── DEVIS NOTOX ──────",
-      "",
       ...lines,
-      "",
       RULE,
       `TOTAL : ${fmtEuro(total)}`,
       RULE,
       "",
       "Merci pour l'intérêt que vous portez à notre démarche et la qualité de notre travail.",
-      "",
       "Nous restons à votre entière disposition.",
       "",
       "À très bientôt,",
@@ -1900,25 +1895,36 @@ function openCalcEmailModal(prefilledBody) {
   const bodyEl    = overlay.querySelector("#qm-body");
   const sendBtn   = overlay.querySelector("#qm-send");
 
-  // Auto-sync sujet ← email tant que l'utilisateur n'a pas édité le sujet à la main.
+  // Auto-sync sujet ← email + téléphone tant que l'utilisateur n'a pas édité le sujet à la main.
   let subjectAuto = true;
   subjectEl.addEventListener("input", () => { subjectAuto = false; });
-  toEl.addEventListener("input", () => {
+  function syncSubject() {
     if (!subjectAuto) return;
     const email = toEl.value.trim();
-    subjectEl.value = email ? SUBJECT_PREFIX + email : SUBJECT_PREFIX.trimEnd();
-  });
+    const phone = phoneEl.value.trim();
+    const base = email ? SUBJECT_PREFIX + email : SUBJECT_PREFIX.trimEnd();
+    subjectEl.value = phone ? `${base} — ${phone}` : base;
+  }
+  toEl.addEventListener("input", syncSubject);
+  phoneEl.addEventListener("input", syncSubject);
 
   sendBtn.addEventListener("click", async () => {
     const to      = toEl.value.trim();
+    const phone   = phoneEl.value.trim();
     const subject = subjectEl.value.trim();
     const body    = bodyEl.value.trim();
-    const phone   = phoneEl.value.trim();
     if (!to)                                          { showToast("⚠ Email destinataire vide"); toEl.focus(); return; }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to))       { showToast("⚠ Email invalide"); toEl.focus(); return; }
     if (!subject)                                     { showToast("⚠ Sujet vide"); subjectEl.focus(); return; }
     if (!body)                                        { showToast("⚠ Message vide"); bodyEl.focus(); return; }
-    const finalSubject = phone ? `${subject} — ${phone}` : subject;
+
+    // Insère "Vos coordonnées : email[ — téléphone]" juste après l'en-tête DEVIS NOTOX
+    // dans le body. On lit la textarea telle quelle pour préserver d'éventuelles édits.
+    const coords = phone ? `${to} — ${phone}` : to;
+    const coordsLine = `Vos coordonnées : ${coords}`;
+    const finalBody = body.includes("────── DEVIS NOTOX ──────")
+      ? body.replace(/(────── DEVIS NOTOX ──────\n)/, `$1${coordsLine}\n`)
+      : `${coordsLine}\n${body}`;
 
     sendBtn.disabled = true;
     sendBtn.innerHTML = `<span class="spinner-xs"></span> Envoi…`;
@@ -1929,8 +1935,8 @@ function openCalcEmailModal(prefilledBody) {
         body: JSON.stringify({
           to,
           cc: ["contact@notoxsurf.com"],
-          subject: finalSubject,
-          body_text: body,
+          subject,
+          body_text: finalBody,
         }),
       });
       if (!resp.ok) {
