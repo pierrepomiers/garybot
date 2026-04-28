@@ -1576,15 +1576,20 @@ function parsePriceCsv(text) {
   return rows;
 }
 
-// Catalogue indexé par type (clé = valeur exacte de la 1ère colonne du CSV),
-// l'ordre du CSV est préservé dans chaque tableau.
+// Catalogue indexé par type (clé = valeur exacte de la 1ère colonne du CSV).
+// `typesOrder` = ordre de 1ère apparition de chaque type dans le CSV : c'est lui
+// qui pilote l'ordre des menus dans la modal (réordonner le CSV → réordonne l'UI).
 function buildPriceCatalog(rows) {
-  const cat = {};
+  const catalog = {};
+  const typesOrder = [];
   for (const r of rows) {
-    if (!cat[r.type]) cat[r.type] = [];
-    cat[r.type].push({ name: r.name, price: r.price });
+    if (!catalog[r.type]) {
+      catalog[r.type] = [];
+      typesOrder.push(r.type);
+    }
+    catalog[r.type].push({ name: r.name, price: r.price });
   }
-  return cat;
+  return { catalog, typesOrder };
 }
 
 // Pas de cache applicatif : re-fetch + re-parse à chaque ouverture du calculateur,
@@ -1636,30 +1641,48 @@ function openPriceCalculator() {
   overlay.querySelector(".modal-header [data-close]")?.addEventListener("click", close);
 
   loadPriceCatalog()
-    .then(catalog => renderCalcModal(overlay, catalog, close))
+    .then(({ catalog, typesOrder }) => renderCalcModal(overlay, catalog, typesOrder, close))
     .catch(err => {
       const body = overlay.querySelector("#calc-body");
       if (body) body.innerHTML = `<div class="modal-info-banner">⚠ Impossible de charger prices.csv : ${escapeHtml(err.message || String(err))}</div>`;
     });
 }
 
-function renderCalcModal(overlay, catalog, close) {
-  // Schéma des 11 menus déroulants. 'noneOption' = fournit un <option value="">— Aucun —</option>
-  // en première position (sélectionnée par défaut). Tous les champs sont optionnels :
-  // un devis pour accessoires seuls (sans planche) doit pouvoir partir sans taille ni modèle.
-  const FIELDS = [
-    { key: "model",          label: "Modèle",           noneOption: true, showPrice: false },
-    { key: "size",           label: "Taille",           noneOption: true, showPrice: true  },
-    { key: "construction",   label: "Construction",     noneOption: true, showPrice: true  },
-    { key: "shape options",  label: "Options de shape", noneOption: true, showPrice: true  },
-    { key: "fins setup",     label: "Setup de dérives", noneOption: true, showPrice: true  },
-    { key: "deco",           label: "Déco",             noneOption: true, showPrice: true  },
-    { key: "leash",          label: "Leash",            noneOption: true, showPrice: true  },
-    { key: "fins",           label: "Dérives",          noneOption: true, showPrice: true  },
-    { key: "boardbag",       label: "Housse",           noneOption: true, showPrice: true  },
-    { key: "pad",            label: "Pad arrière",      noneOption: true, showPrice: true  },
-    { key: "speciality",     label: "Spécialité",       noneOption: true, showPrice: true  },
-  ];
+// Libellés FR des types du CSV. Cette table définit UNIQUEMENT les libellés affichés ;
+// l'ordre des menus dans la modal vient de l'ordre de 1ère apparition dans le CSV.
+// Fallback : type non listé → on capitalise le type brut.
+const TYPE_LABELS = {
+  "model":         "Modèle",
+  "size":          "Taille",
+  "construction":  "Construction",
+  "shape options": "Options de shape",
+  "fins setup":    "Setup de dérives",
+  "deco":          "Déco",
+  "leash":         "Leash",
+  "fins":          "Dérives",
+  "boardbag":      "Housse",
+  "pad":           "Pad arrière",
+  "speciality":    "Spécialité",
+};
+
+// Types dont les options ne montrent pas de prix dans le <select> (et qui ne contribuent
+// pas au total — déjà garanti par price=null en CSV pour 'model').
+const TYPES_NO_PRICE_DISPLAY = new Set(["model"]);
+
+function labelForType(type) {
+  return TYPE_LABELS[type] || (type.charAt(0).toUpperCase() + type.slice(1));
+}
+
+function renderCalcModal(overlay, catalog, typesOrder, close) {
+  // Schéma des menus dérivé du CSV : l'ordre suit `typesOrder` (1ère apparition de chaque
+  // type). 'noneOption' = <option value="">— Aucun —</option> en tête, sélectionné par défaut.
+  // Tous les champs sont optionnels (devis accessoires seuls possible sans modèle ni taille).
+  const FIELDS = typesOrder.map(key => ({
+    key,
+    label: labelForType(key),
+    noneOption: true,
+    showPrice: !TYPES_NO_PRICE_DISPLAY.has(key),
+  }));
 
   // État : pour chaque field.key, l'item sélectionné ou null. Tout démarre à null
   // (l'option « Aucun » de chaque <select> est sélectionnée par défaut côté DOM).
