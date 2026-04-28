@@ -10,21 +10,21 @@ speciality;SUP;500
 speciality;SUPFOIL;750
 speciality;RESCUE;1000
 speciality;RACE PADDLE;1250
-size;4'0;820
-size;4'1;820
-size;4'2;820
-size;4'3;820
-size;4'4;820
-size;4'5;820
-size;4'6;820
-size;4'7;820
-size;4'8;820
-size;4'9;820
-size;4'10;820
-size;4'11;820
-size;5'0;820
-size;5'1;820
-size;5'2;820
+size;4'0;800
+size;4'1;800
+size;4'2;800
+size;4'3;800
+size;4'4;800
+size;4'5;800
+size;4'6;800
+size;4'7;800
+size;4'8;800
+size;4'9;800
+size;4'10;800
+size;4'11;800
+size;5'0;800
+size;5'1;800
+size;5'2;810
 size;5'3;820
 size;5'4;830
 size;5'5;840
@@ -116,7 +116,6 @@ leash;LEASH 6';30
 leash;LEASH 7';31
 leash;LEASH 8';32
 leash;LEASH 9';34
-fins;SINGLE FIN FIBRE;90
 fins;3 FUTURES ALPHA;78
 fins;5 FUTURES ALPHA;108
 fins;3 FUTURES/FCS2 FIBRE;138
