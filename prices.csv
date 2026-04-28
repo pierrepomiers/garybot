@@ -3,7 +3,13 @@ model;SHORTBOARD;
 model;HYBRID;
 model;MIDLENGTH;
 model;LONGBOARD;
-model;OTHER;
+speciality;SURFOIL;400
+speciality;WINGFOIL;800
+speciality;DOWNWIND;1000
+speciality;SUP;500
+speciality;SUPFOIL;750
+speciality;RESCUE;1000
+speciality;RACE PADDLE;1250
 size;4'0;820
 size;4'1;820
 size;4'2;820
@@ -90,13 +96,12 @@ size;10'10;1590
 size;10'11;1600
 construction;KORKO;100
 construction;GREENONE;150
-construction;GREENFLX;250
+construction;GREENFLEX;250
 construction;R-CARBON;400
-construction;BLACKFLX;650
+construction;BLACKFLEX;650
 shape options;2 x CHANNELS;60
 shape options;4 x CHANNELS;90
 shape options;WINGS;60
-fins setup;CHANNELS;90
 fins setup;TWIN;0
 fins setup;3 FINS;0
 fins setup;4 FINS;20
@@ -122,10 +127,3 @@ boardbag;BOARDBG 7'6;93
 boardbag;BOARDBG 8';95
 boardbag;BOARDBAG 9';114
 pad;PAD ARRIERE;48
-speciality;SURFOIL;400
-speciality;WINGFOIL;800
-speciality;DOWNWIND;1000
-speciality;SUP;500
-speciality;SUPFOIL;1500
-speciality;RESCUE;1500
-speciality;RACE PADDLE;1500
