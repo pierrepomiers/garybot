@@ -810,6 +810,11 @@ let S = {
   sendHistoryIndex: new Map(),
   // Délais (chargés depuis app_settings, fallback sur DEFAULT_*)
   settings: { archive_delay_days: DEFAULT_ARCHIVE_DELAY_DAYS, purge_delay_days: DEFAULT_PURGE_DELAY_DAYS },
+  // Ordres de tri figés pendant une session de vue (évite les sauts de cartes
+  // quand on ajoute une ligne / coche une étape). Réinitialisés au changement
+  // de vue (cf. render()) et au sync manuel (cf. sync-btn). null = recalcul lazy.
+  cartSupplierOrder: null,   // [supplier_key] dans l'ordre figé pour la vue Paniers
+  boardOrderFrozen:  null,   // [order_id]      dans l'ordre figé pour la vue Orders
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -2484,14 +2489,27 @@ function renderSupplierMailPreview(supplier, items) {
 }
 
 function renderSupplierCarts() {
-  const keys = Object.keys(S.suppliersByKey).filter(k => S.suppliersByKey[k].active !== false);
-  // Tri : non vides d'abord
-  keys.sort((a, b) => {
+  const allActiveKeys = Object.keys(S.suppliersByKey).filter(k => S.suppliersByKey[k].active !== false);
+  // Tri figé pendant la session sur la vue : sinon une carte saute en haut
+  // dès qu'on lui ajoute sa 1re ligne (perte du contexte visuel sur mobile).
+  // Recalcul à la prochaine entrée dans la vue (cf. render()).
+  const naturalSort = (a, b) => {
     const ca = pendingItemsForSupplier(a).length;
     const cb = pendingItemsForSupplier(b).length;
     if (cb !== ca) return cb - ca;
     return (S.suppliersByKey[a].name || "").localeCompare(S.suppliersByKey[b].name || "");
-  });
+  };
+  let keys;
+  if (S.cartSupplierOrder === null) {
+    keys = [...allActiveKeys].sort(naturalSort);
+    S.cartSupplierOrder = [...keys];
+  } else {
+    const knownSet = new Set(S.cartSupplierOrder);
+    const frozen = S.cartSupplierOrder.filter(k => allActiveKeys.includes(k));
+    // Newcomer (fournisseur créé pendant la session) : ajouté à la fin pour rester visible.
+    const newcomers = allActiveKeys.filter(k => !knownSet.has(k)).sort(naturalSort);
+    keys = [...frozen, ...newcomers];
+  }
 
   const cards = keys.map(k => {
     const sup = S.suppliersByKey[k];
@@ -2937,12 +2955,29 @@ function filteredOrders() {
   if (S.filter==="pending") orders=orders.filter(o=>getProgress(o.id)<100);
   if (S.filter==="done")    orders=orders.filter(o=>getProgress(o.id)===100);
   if (S.filter==="urgent")  orders=orders.filter(o=>S.meta[o.id]?.priority==="urgent");
-  // Trier : urgent en premier, puis par date
-  orders.sort((a,b) => {
+  // Tri figé pendant la session sur le board : on coche une étape ou on toggle
+  // l'urgence sans que la carte saute. Recalcul à l'entrée dans la vue (cf.
+  // render()) ou au sync manuel (cf. sync-btn). Le freeze est calculé sur
+  // toutes les commandes actives pour rester stable quels que soient les
+  // filtres/recherches courants.
+  const naturalSort = (a, b) => {
     const ap = S.meta[a.id]?.priority==="urgent" ? 0:1;
     const bp = S.meta[b.id]?.priority==="urgent" ? 0:1;
     if (ap!==bp) return ap-bp;
     return new Date(b.date_order||0) - new Date(a.date_order||0);
+  };
+  if (S.boardOrderFrozen === null) {
+    const allActive = S.orders.filter(o => !S.meta[o.id]?.archived);
+    allActive.sort(naturalSort);
+    S.boardOrderFrozen = allActive.map(o => o.id);
+  }
+  const pos = new Map(S.boardOrderFrozen.map((id, i) => [id, i]));
+  orders.sort((a, b) => {
+    const pa = pos.has(a.id) ? pos.get(a.id) : Number.MAX_SAFE_INTEGER;
+    const pb = pos.has(b.id) ? pos.get(b.id) : Number.MAX_SAFE_INTEGER;
+    if (pa !== pb) return pa - pb;
+    // Tiebreaker pour les newcomers (commandes apparues post-freeze) : tri naturel.
+    return naturalSort(a, b);
   });
   return orders;
 }
@@ -2950,12 +2985,29 @@ function filteredOrders() {
 // ══════════════════════════════════════════════════════════════════════════════
 // RENDER
 // ══════════════════════════════════════════════════════════════════════════════
+let _lastRenderedView = null;
 function render() {
+  // À chaque changement de vue, on libère les ordres figés : la prochaine
+  // ouverture recalcule le tri avec les données fraîches. Les ré-rendus
+  // intra-vue (coche d'étape, ajout de ligne, urgence togglée…) conservent
+  // le freeze pour ne pas faire sauter les cartes.
+  const _viewChanged = S.view !== _lastRenderedView;
+  if (_viewChanged) {
+    S.cartSupplierOrder = null;
+    S.boardOrderFrozen  = null;
+    _lastRenderedView = S.view;
+  }
   const app = document.getElementById("app");
   if (!sb)             { app.innerHTML=`<div class="loading"><div class="spinner"></div><br>Init...</div>`; return; }
   if (S.view==="login")    { app.innerHTML=renderLogin();              bindLogin();    return; }
   if (S.view==="settings") { app.innerHTML=renderShell(renderSettings()); bindSettings(); return; }
-  if (S.view==="supplier_carts") { app.innerHTML=renderShell(renderSupplierCarts()); bindSupplierCarts(); return; }
+  if (S.view==="supplier_carts") {
+    app.innerHTML=renderShell(renderSupplierCarts()); bindSupplierCarts();
+    // À l'entrée dans la vue (sortie + retour), on remet le scroll en haut
+    // de la liste pour ne pas atterrir au milieu d'un panier précédent.
+    if (_viewChanged) window.scrollTo(0, 0);
+    return;
+  }
   app.innerHTML=renderShell(renderOrders());
   bindOrders();
 }
@@ -3388,7 +3440,11 @@ function bindNav() {
   document.getElementById("nav-logout")?.addEventListener("click", (e)=>{ e.stopPropagation(); S.userMenuOpen=false; logout(); });
   document.getElementById("sync-btn")?.addEventListener("click", async()=>{
     S.userMenuOpen=false; render();
-    await syncOdoo(); render();
+    await syncOdoo();
+    // Sync manuel = signal explicite "je veux des données fraîches" : on libère
+    // l'ordre figé du board pour que le re-tri s'applique avec les nouvelles données.
+    S.boardOrderFrozen = null;
+    render();
   });
   document.getElementById("menu-toggle")?.addEventListener("click", (e)=>{
     e.stopPropagation();
