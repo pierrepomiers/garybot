@@ -1771,16 +1771,21 @@ function renderCalcModal(overlay, catalog, close) {
     detailToggle.textContent = hidden ? "▸ Détail du calcul" : "▾ Détail du calcul";
   });
 
-  function buildFullMessage() {
+  // coordsLine optionnelle, insérée dans le template juste après l'en-tête DEVIS NOTOX.
+  // Vide → pas de ligne « Vos coordonnées » (cas copier/SMS où l'email n'est pas connu).
+  function buildFullMessage(coordsLine = "") {
     const { total, lines } = buildLines();
     if (!sel.size) return null;
     const RULE = "─────────────────────────";
-    return [
+    const out = [
       "Bonjour,",
       "",
       "Merci pour votre visite à l'atelier. Voici pour mémoire l'estimation de prix de votre projet de planche :",
       "",
       "────── DEVIS NOTOX ──────",
+    ];
+    if (coordsLine) out.push(coordsLine);
+    out.push(
       ...lines,
       RULE,
       `TOTAL : ${fmtEuro(total)}`,
@@ -1791,7 +1796,8 @@ function renderCalcModal(overlay, catalog, close) {
       "",
       "À très bientôt,",
       "L'équipe NOTOX 🤙",
-    ].join("\n");
+    );
+    return out.join("\n");
   }
 
   function openExternalLink(url) {
@@ -1820,9 +1826,11 @@ function renderCalcModal(overlay, catalog, close) {
   });
 
   emailBtn.addEventListener("click", () => {
-    const text = buildFullMessage();
-    if (!text) { showToast("⚠ Choisis une taille pour calculer"); return; }
-    openCalcEmailModal(text);
+    if (!sel.size) { showToast("⚠ Choisis une taille pour calculer"); return; }
+    // On passe la fonction (et non le texte pré-construit) pour pouvoir
+    // re-générer le body avec la ligne « Vos coordonnées » dès que l'email
+    // ou le téléphone change dans la sous-modal.
+    openCalcEmailModal(buildFullMessage);
   });
 
   smsBtn.addEventListener("click", () => {
@@ -1837,9 +1845,10 @@ function renderCalcModal(overlay, catalog, close) {
 
 // Sous-modal de composition email pour le devis. Pas de body-lock supplémentaire :
 // la modal calculatrice parente a déjà verrouillé le scroll body.
-function openCalcEmailModal(prefilledBody) {
+function openCalcEmailModal(buildBody) {
   // Sujet auto-syncé sur l'email du client tant qu'il n'a pas été édité à la main.
   const SUBJECT_PREFIX = "🚨 Devis NOTOX 🚨 - ";
+  const initialBody = buildBody("");
   const overlay = document.createElement("div");
   overlay.className = "modal-overlay";
   overlay.innerHTML = `
@@ -1869,7 +1878,7 @@ function openCalcEmailModal(prefilledBody) {
         </div>
         <div>
           <label class="field-label" for="qm-body">Message</label>
-          <textarea id="qm-body" class="field-textarea" spellcheck="true" style="min-height:280px;">${escapeHtml(prefilledBody)}</textarea>
+          <textarea id="qm-body" class="field-textarea" spellcheck="true" style="min-height:280px;">${escapeHtml(initialBody)}</textarea>
         </div>
       </div>
       <div class="modal-footer">
@@ -1895,6 +1904,15 @@ function openCalcEmailModal(prefilledBody) {
   const bodyEl    = overlay.querySelector("#qm-body");
   const sendBtn   = overlay.querySelector("#qm-send");
 
+  // Construit la ligne « Vos coordonnées » à partir de l'état courant des champs.
+  // Vide si email vide → buildBody("") n'insère rien dans le template.
+  function currentCoordsLine() {
+    const email = toEl.value.trim();
+    if (!email) return "";
+    const phone = phoneEl.value.trim();
+    return phone ? `Vos coordonnées : ${email} — ${phone}` : `Vos coordonnées : ${email}`;
+  }
+
   // Auto-sync sujet ← email + téléphone tant que l'utilisateur n'a pas édité le sujet à la main.
   let subjectAuto = true;
   subjectEl.addEventListener("input", () => { subjectAuto = false; });
@@ -1905,26 +1923,31 @@ function openCalcEmailModal(prefilledBody) {
     const base = email ? SUBJECT_PREFIX + email : SUBJECT_PREFIX.trimEnd();
     subjectEl.value = phone ? `${base} — ${phone}` : base;
   }
-  toEl.addEventListener("input", syncSubject);
-  phoneEl.addEventListener("input", syncSubject);
+
+  // Auto-sync body ← email + téléphone (re-build via buildBody pour insérer la ligne
+  // « Vos coordonnées » dans le template). Préserve les édits manuels via bodyAuto.
+  let bodyAuto = true;
+  bodyEl.addEventListener("input", () => { bodyAuto = false; });
+  function syncBody() {
+    if (!bodyAuto) return;
+    bodyEl.value = buildBody(currentCoordsLine());
+  }
+
+  toEl.addEventListener("input", () => { syncSubject(); syncBody(); });
+  phoneEl.addEventListener("input", () => { syncSubject(); syncBody(); });
 
   sendBtn.addEventListener("click", async () => {
     const to      = toEl.value.trim();
-    const phone   = phoneEl.value.trim();
     const subject = subjectEl.value.trim();
-    const body    = bodyEl.value.trim();
     if (!to)                                          { showToast("⚠ Email destinataire vide"); toEl.focus(); return; }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to))       { showToast("⚠ Email invalide"); toEl.focus(); return; }
     if (!subject)                                     { showToast("⚠ Sujet vide"); subjectEl.focus(); return; }
-    if (!body)                                        { showToast("⚠ Message vide"); bodyEl.focus(); return; }
 
-    // Insère "Vos coordonnées : email[ — téléphone]" juste après l'en-tête DEVIS NOTOX
-    // dans le body. On lit la textarea telle quelle pour préserver d'éventuelles édits.
-    const coords = phone ? `${to} — ${phone}` : to;
-    const coordsLine = `Vos coordonnées : ${coords}`;
-    const finalBody = body.includes("────── DEVIS NOTOX ──────")
-      ? body.replace(/(────── DEVIS NOTOX ──────\n)/, `$1${coordsLine}\n`)
-      : `${coordsLine}\n${body}`;
+    // Body envoyé : si l'utilisateur n'a pas édité la textarea (bodyAuto), on rebuild
+    // proprement à partir du template pour garantir la présence de « Vos coordonnées ».
+    // Sinon on respecte ses édits tels quels.
+    const finalBody = (bodyAuto ? buildBody(currentCoordsLine()) : bodyEl.value).trim();
+    if (!finalBody) { showToast("⚠ Message vide"); bodyEl.focus(); return; }
 
     sendBtn.disabled = true;
     sendBtn.innerHTML = `<span class="spinner-xs"></span> Envoi…`;
