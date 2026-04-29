@@ -440,6 +440,22 @@ header {
   background-size:5px 5px, 5px 5px; background-repeat:no-repeat; padding-right:34px;
 }
 .calc-select:focus { border-color:rgba(59,130,246,.45); }
+.calc-checkbox-group {
+  margin:0; padding:10px 12px;
+  background:var(--bg3); border:1px solid var(--border); border-radius:8px;
+  display:flex; flex-direction:column; gap:8px; min-width:0;
+}
+.calc-checkbox-group legend.field-label {
+  padding:0; margin-bottom:6px; float:left; width:100%;
+}
+.calc-checkbox-item {
+  display:flex; align-items:center; gap:10px; cursor:pointer;
+  font-size:14px; color:var(--text); font-family:var(--sans);
+}
+.calc-checkbox-item input[type=checkbox] {
+  accent-color:var(--accent);
+  width:16px; height:16px; cursor:pointer; flex-shrink:0;
+}
 .calc-total-bar {
   display:flex; align-items:center; justify-content:space-between; gap:10px;
   padding:10px 14px; background:rgba(59,130,246,.1); border-radius:10px;
@@ -1691,7 +1707,11 @@ function renderCalcModal(overlay, catalog, typesOrder, close) {
 
   // État : pour chaque field.key, l'item sélectionné ou null. Tout démarre à null
   // (l'option « Aucun » de chaque <select> est sélectionnée par défaut côté DOM).
-  const sel = Object.fromEntries(FIELDS.map(f => [f.key, null]));
+  // Cas spécial : 'shape options' est multi-sélection → tableau (vide par défaut).
+  const sel = Object.fromEntries(FIELDS.map(f => [
+    f.key,
+    f.key === "shape options" ? [] : null,
+  ]));
 
   const card = overlay.querySelector(".modal-card");
   const oldBody = card.querySelector("#calc-body");
@@ -1712,15 +1732,35 @@ function renderCalcModal(overlay, catalog, typesOrder, close) {
     return opts;
   };
 
-  oldBody.outerHTML = `
-    <div class="modal-body" id="calc-body">
-      ${FIELDS.map(f => `
+  // 'shape options' est rendu en groupe de checkboxes (multi-sélection cumulative).
+  // Tous les autres champs restent en <select> mono-sélection.
+  const renderField = (f) => {
+    if (f.key === "shape options") {
+      const items = catalog[f.key] || [];
+      const checks = items.map((it, i) => {
+        const labelTxt = it.price != null ? `${it.name} — ${fmtEuro(it.price)}` : it.name;
+        return `<label class="calc-checkbox-item"><input type="checkbox" data-field="${escapeHtml(f.key)}" data-idx="${i}"> ${escapeHtml(labelTxt)}</label>`;
+      }).join("");
+      return `
+      <div class="calc-section">
+        <fieldset class="calc-checkbox-group">
+          <legend class="field-label">${escapeHtml(f.label)}</legend>
+          ${checks}
+        </fieldset>
+      </div>`;
+    }
+    return `
       <div class="calc-section">
         <label class="field-label" for="${fieldId(f.key)}">${escapeHtml(f.label)}</label>
         <select id="${fieldId(f.key)}" class="calc-select" data-field="${escapeHtml(f.key)}">
           ${renderOptions(f)}
         </select>
-      </div>`).join("")}
+      </div>`;
+  };
+
+  oldBody.outerHTML = `
+    <div class="modal-body" id="calc-body">
+      ${FIELDS.map(renderField).join("")}
 
       <div>
         <button type="button" class="calc-detail-toggle" id="calc-detail-toggle">▸ Détail du calcul</button>
@@ -1754,18 +1794,35 @@ function renderCalcModal(overlay, catalog, typesOrder, close) {
   card.querySelectorAll("[data-close]").forEach(b => b.addEventListener("click", close));
 
   // Construit les lignes du devis : uniquement les champs sélectionnés (non « Aucun »).
+  // Règles particulières :
+  //  - 'shape options' est multi-sélection → une ligne par option cochée.
+  //  - 'speciality' : prix toujours compté dans le total, mais ligne masquée du devis
+  //    si le modèle sélectionné n'est pas 'OTHER' (comparaison robuste casse/espaces).
   function buildLines() {
     const lines = [];
     let total = 0;
+    const modelName = (sel.model?.name || "").trim().toUpperCase();
+    const showSpeciality = modelName === "OTHER";
+    const pushItemLine = (label, item) => {
+      if (item.price != null) {
+        lines.push(`${label} : ${item.name} — ${fmtEuro(item.price)}`);
+      } else {
+        lines.push(`${label} : ${item.name}`);
+      }
+    };
     for (const f of FIELDS) {
+      if (f.key === "shape options") {
+        for (const item of (sel[f.key] || [])) {
+          if (item.price != null) total += item.price;
+          pushItemLine(f.label, item);
+        }
+        continue;
+      }
       const item = sel[f.key];
       if (!item) continue;
-      if (item.price != null) {
-        total += item.price;
-        lines.push(`${f.label} : ${item.name} — ${fmtEuro(item.price)}`);
-      } else {
-        lines.push(`${f.label} : ${item.name}`);
-      }
+      if (item.price != null) total += item.price;
+      if (f.key === "speciality" && !showSpeciality) continue;
+      pushItemLine(f.label, item);
     }
     return { total, lines };
   }
@@ -1783,14 +1840,24 @@ function renderCalcModal(overlay, catalog, typesOrder, close) {
     return { total, lines, hasTotal };
   }
 
-  // Event delegation : tous les <select> du body remontent ici.
+  // Event delegation : <select> mono-sélection + checkboxes 'shape options' multi-sélection.
   body.addEventListener("change", (e) => {
-    const selectEl = e.target;
-    if (!selectEl || selectEl.tagName !== "SELECT" || !selectEl.dataset.field) return;
-    const key = selectEl.dataset.field;
-    const v = selectEl.value;
-    sel[key] = v === "" ? null : (catalog[key] || [])[Number(v)] || null;
-    recompute();
+    const el = e.target;
+    if (!el || !el.dataset || !el.dataset.field) return;
+    const key = el.dataset.field;
+    if (el.tagName === "SELECT") {
+      const v = el.value;
+      sel[key] = v === "" ? null : (catalog[key] || [])[Number(v)] || null;
+      recompute();
+      return;
+    }
+    if (el.tagName === "INPUT" && el.type === "checkbox" && key === "shape options") {
+      const items = catalog[key] || [];
+      sel[key] = Array.from(
+        body.querySelectorAll('input[type=checkbox][data-field="shape options"]:checked')
+      ).map(cb => items[Number(cb.dataset.idx)]).filter(Boolean);
+      recompute();
+    }
   });
 
   detailToggle.addEventListener("click", () => {
