@@ -568,6 +568,10 @@ header {
   opacity: 1;
   margin-top: 8px;
 }
+.fo-categories { display:flex; flex-wrap:wrap; gap:14px; padding:8px 0; }
+.fo-cat-row { display:flex; align-items:center; gap:6px; cursor:pointer; user-select:none; font-family:var(--mono); font-size:13px; color:var(--text); }
+.fo-cat-row input { accent-color:var(--accent); width:16px; height:16px; }
+.fo-help { color:var(--muted); cursor:help; font-size:12px; }
 
 /* ── SUPPLIER CARTS VIEW ── */
 #supplier-carts-screen { flex:1; padding:14px 12px 28px; max-width:900px; margin:0 auto; width:100%; }
@@ -784,12 +788,32 @@ const DEFAULT_ARCHIVE_DELAY_DAYS = 15;
 const DEFAULT_PURGE_DELAY_DAYS = 30;
 
 // ══════════════════════════════════════════════════════════════════════════════
+// CATÉGORIES DE FOURNISSEURS
+// Pilote l'affichage des fournisseurs dans les selecteurs des étapes
+// BLANK / PRESHAPE / ACCESS. La liste des fournisseurs proposés vient
+// désormais de fournisseurs.categories (TEXT[] côté Supabase) — plus aucun
+// nom hard-codé dans STEPS. Pour ajouter un fournisseur dans un selecteur :
+// cocher la catégorie dans Réglages.
+// ══════════════════════════════════════════════════════════════════════════════
+const SUPPLIER_CATEGORIES = [
+  { id: "blank",    label: "Blank" },
+  { id: "preshape", label: "Preshape" },
+  { id: "access",   label: "Accessoires" },
+];
+
+const STEP_TO_CATEGORY = {
+  appro_blank:  "blank",
+  cmd_preshape: "preshape",
+  cmd_access:   "access",
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
 // ÉTAPES
 // ══════════════════════════════════════════════════════════════════════════════
 const STEPS = [
-  { id:"appro_blank",  label:"Appro. Blank",  fourn:["Viral","Atua","Ben"],         clientMail:false },
-  { id:"cmd_preshape", label:"Cmd. Preshape", fourn:["Viral","Atua","Ben"],         clientMail:false },
-  { id:"cmd_access",   label:"Cmd. Access.",  fourn:["Viral","FCS","Surf System","SURF LOUNGE"],  clientMail:false },
+  { id:"appro_blank",  label:"Appro. Blank",  clientMail:false },
+  { id:"cmd_preshape", label:"Cmd. Preshape", clientMail:false },
+  { id:"cmd_access",   label:"Cmd. Access.",  clientMail:false },
   { id:"shape",        label:"shape",         fourn:null, clientMail:true  },
   { id:"deco",         label:"déco",          fourn:null, clientMail:true  },
   { id:"strat",        label:"stratification",fourn:null, clientMail:true  },
@@ -801,6 +825,21 @@ const STEPS = [
   { id:"emballage",    label:"emballage",     fourn:null, clientMail:true  },
   { id:"livraison",    label:"livraison",     fourn:null, clientMail:true, isLivraison:true },
 ];
+
+// Retourne la liste des fournisseurs (objets de S.suppliersByKey) à proposer
+// pour une étape donnée. Filtre par catégorie + actif. Retourne [] pour les
+// étapes non-fournisseur (shape, deco, etc.).
+function suppliersForStep(stepId) {
+  const cat = STEP_TO_CATEGORY[stepId];
+  if (!cat) return [];
+  return Object.values(S.suppliersByKey)
+    .filter(sup =>
+      sup.active !== false &&
+      Array.isArray(sup.categories) &&
+      sup.categories.includes(cat)
+    )
+    .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // STATE
@@ -922,6 +961,7 @@ async function loadFournisseurs() {
         template_footer:  f.template_footer  || (window.SUPPLIER_TEMPLATES?.defaultFooter  || "Merci,\nNOTOX"),
         notes: f.notes || "",
         active: f.active !== false,
+        categories: Array.isArray(f.categories) ? f.categories : [],
       };
     }
   });
@@ -2116,16 +2156,11 @@ function buildInitialSupplierItems(order) {
 }
 
 function openSupplierCartModal(order, stepLabel, stepId, progress) {
-  const step = STEPS.find(s => s.id === stepId);
-  const allowedNames = (step && step.fourn) || [];
-  if (allowedNames.length === 0) { showToast("⚠ Pas de fournisseur pour cette étape"); return; }
+  const allowed = suppliersForStep(stepId);
+  if (allowed.length === 0) { showToast("⚠ Pas de fournisseur pour cette étape"); return; }
 
-  // Fournisseurs autorisés (même manquants dans suppliersByKey, on les liste)
-  const candidates = allowedNames.map(n => {
-    const key = supplierNameToKey(n);
-    const row = S.suppliersByKey[key] || null;
-    return { name: n, key, row };
-  }).filter(c => !c.row || c.row.active !== false);
+  // Fournisseurs autorisés : suppliersForStep filtre déjà par catégorie + actif.
+  const candidates = allowed.map(sup => ({ name: sup.name, key: sup.key, row: sup }));
 
   let selectedKey = candidates[0]?.key || null;
   let lines = buildInitialSupplierItems(order);
@@ -3254,7 +3289,7 @@ function renderCard(order) {
 
     let supplierBtnHtml = "";
     let reminderBtnsHtml = "";
-    if (step.fourn && isDone) {
+    if (STEP_TO_CATEGORY[step.id] && isDone) {
       const hasSent = S.supplierSentIndex.has(`${oid}|${step.id}`);
       const sends = getSupplierSendsForStep(oid, step.id);
       let supplierDateLabel = "";
@@ -3366,6 +3401,17 @@ function renderSettings() {
       </div>
       <div class="fo-collapsible-content">
       <div class="fo-grid">
+        <div class="full">
+          <label class="fo-label">Catégories <span class="fo-help" title="Détermine dans quels selecteurs d'étapes ce fournisseur apparaît (Appro. Blank, Cmd. Preshape, Cmd. Access.)">ℹ</span></label>
+          <div class="fo-categories">
+            ${SUPPLIER_CATEGORIES.map(cat => `
+              <label class="fo-cat-row">
+                <input type="checkbox" data-cat="${cat.id}" data-supplier-key="${k}" ${(s.categories || []).includes(cat.id) ? "checked" : ""}>
+                <span>${cat.label}</span>
+              </label>
+            `).join("")}
+          </div>
+        </div>
         <div>
           <label class="fo-label">Email</label>
           <input class="form-input" data-fo-field="email" type="email" placeholder="fournisseur@example.com" value="${escapeHtml(s.email||"")}">
@@ -3649,8 +3695,9 @@ function bindOrderCards() {
 }
 
 // Modal de création d'un nouveau fournisseur.
-// Scope volontairement limité : crée uniquement la fiche. L'association
-// fournisseur ↔ étapes reste hardcodée dans STEPS (voir toast post-création).
+// Scope : crée uniquement la fiche (categories vide). Pour qu'il apparaisse
+// dans un selecteur d'étape, l'utilisateur doit cocher la catégorie
+// (Blank/Preshape/Accessoires) sur la fiche en Réglages.
 function openNewSupplierModal() {
   const overlay = document.createElement("div");
   overlay.className = "modal-overlay";
@@ -3661,7 +3708,7 @@ function openNewSupplierModal() {
           <span class="modal-title-icon" aria-hidden="true">➕</span>
           <span class="modal-title-text">
             <span>Nouveau fournisseur</span>
-            <small>La liste des étapes autorisées reste gérée dans STEPS (code)</small>
+            <small>Coche les catégories sur la fiche pour le rendre disponible dans les étapes</small>
           </span>
         </div>
         <button class="modal-close" data-close aria-label="Fermer">×</button>
@@ -3777,7 +3824,7 @@ function openNewSupplierModal() {
       render();
       showToast(`✓ Fournisseur ${nameVal} créé`);
       setTimeout(() => {
-        showToast(`⚠ Pour que ${nameVal} apparaisse comme option dans une étape, il faut encore modifier STEPS dans index.html`, 5000);
+        showToast(`⚠ Coche une catégorie (Blank/Preshape/Accessoires) sur la fiche ${nameVal} pour qu'il apparaisse dans les étapes`, 5000);
       }, 2800);
     } catch (err) {
       console.error(err);
@@ -3866,6 +3913,8 @@ function bindSettings() {
     const get = field => row.querySelector(`[data-fo-field="${field}"]`);
     const current = S.suppliersByKey[key] || {};
     const ccRaw = (get("cc")?.value || "").split(",").map(s=>s.trim()).filter(Boolean);
+    const categories = Array.from(row.querySelectorAll('input[data-cat]:checked'))
+      .map(cb => cb.dataset.cat);
     const payload = {
       name: current.name,                      // clé de conflit
       key,
@@ -3882,6 +3931,7 @@ function bindSettings() {
       template_footer:  get("template_footer")?.value || "",
       notes: get("notes")?.value || "",
       active: !!get("active")?.checked,
+      categories,
       updated_at: new Date().toISOString(),
     };
     btn.disabled = true; const prevTxt = btn.textContent; btn.textContent = "…";
