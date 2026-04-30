@@ -7,7 +7,7 @@ const MESSAGES = {
 
 On a une bonne nouvelle !
 
-La commande NOTOX ${ref} avance bien : on a réalisé ${progress}% du travail. 
+La commande NOTOX ${ref} avance bien : on a réalisé ${progress}% du travail.
 
 En ce moment, on s'occupe de l'étape de ${stepLabel}.
 
@@ -26,4 +26,32 @@ On se reparle très rapidement pour organiser la livraison ou le retrait à l'at
 À bientôt,
 
 L'équipe NOTOX.`,
+};
+
+// Pendant anglais — même signatures, même format (string body).
+// stepLabel reçu côté EN est déjà traduit par buildClientMessageDefaults().
+const MESSAGES_EN = {
+  default: (firstName, ref, stepLabel, progress) => `Hello ${firstName},
+
+Good news from the workshop!
+
+Your NOTOX order ${ref} is coming along nicely — we're now ${progress}% of the way through.
+
+Right now, we're working on the ${stepLabel} of your board.
+
+We'll keep you posted as things move forward!
+
+Talk soon,
+
+The NOTOX team 🤙`,
+
+  livraison: (firstName, ref) => `Hello ${firstName},
+
+Your board is ready! NOTOX order ${ref} is officially done.
+
+We'll be in touch very soon to set up shipping or pickup at the workshop.
+
+Talk soon,
+
+The NOTOX team 🤙`,
 };

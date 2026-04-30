@@ -9,8 +9,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="messages.js?v=1776776084"></script>
-<script src="supplier_templates.js?v=1776776084"></script>
+<script src="messages.js?v=1777561112"></script>
+<script src="supplier_templates.js?v=1777561112"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -379,6 +379,27 @@ header {
   font-size:13px; line-height:1.5;
 }
 .modal-info-banner b { color:var(--red); font-weight:700; }
+.lang-toggle-row {
+  display:flex; align-items:center; gap:10px; padding:4px 0 2px;
+  justify-content:center; font-family:var(--mono); font-size:13px;
+}
+.lang-toggle-row .lang-label { color:var(--muted); transition:color .2s; user-select:none; }
+.lang-toggle-row .lang-label.active { color:var(--accent); font-weight:700; }
+.lang-switch { position:relative; display:inline-block; width:44px; height:24px; }
+.lang-switch input { opacity:0; width:0; height:0; }
+.lang-slider {
+  position:absolute; cursor:pointer; inset:0;
+  background:var(--bg3); border:1px solid var(--border);
+  border-radius:24px; transition:.2s;
+}
+.lang-slider::before {
+  content:""; position:absolute; height:18px; width:18px;
+  left:2px; bottom:2px; background:var(--text);
+  border-radius:50%; transition:.2s;
+}
+.lang-switch input:checked + .lang-slider { background:rgba(245,158,11,.45); border-color:rgba(245,158,11,.6); }
+.lang-switch input:checked + .lang-slider::before { transform:translateX(20px); }
+.lang-switch input:focus-visible + .lang-slider { outline:2px solid var(--accent); outline-offset:2px; }
 .photo-picker {
   display:flex; flex-wrap:wrap; gap:8px;
 }
@@ -1414,22 +1435,43 @@ function bindQtyArrowKeys(inp) {
   });
 }
 
-function buildClientMessageDefaults(order, stepLabel, stepId, progress) {
+// stepLabel FR (depuis STEPS) → EN, pour reformuler sujet + body en anglais.
+const STEP_LABEL_EN = {
+  shape:        "shape",
+  deco:         "artwork",
+  strat:        "glassing",
+  poncage:      "sanding",
+  finition:     "finishing",
+  post_cuisson: "post-curing",
+  emballage:    "packaging",
+  livraison:    "delivery",
+};
+
+function buildClientMessageDefaults(order, stepLabel, stepId, progress, lang = "fr") {
   const rawName   = (order.partner_detail?.name || "").trim();
   const firstName = rawName.split(/\s+/)[0] || "";
   const ref       = order.name || "";
 
-  const subject = stepId === "livraison"
-    ? `Commande NOTOX ${ref} – prête !`
-    : `Commande NOTOX ${ref} – ${stepLabel} en cours !`;
-
   // Bug historique : `const MESSAGES` dans messages.js N'EST PAS attaché
   // à window (seuls var/function le sont). Il faut donc tester via typeof
-  // sur l'identifiant global, pas via window.MESSAGES.
-  const hasMessages = typeof MESSAGES !== "undefined";
-  console.log("[msg] MESSAGES defined?", hasMessages, "stepId:", stepId, "keys:", hasMessages ? Object.keys(MESSAGES) : "—");
-  const template = hasMessages ? (MESSAGES[stepId] || MESSAGES.default) : null;
-  const body = template ? template(firstName, ref, stepLabel, progress) : "";
+  // sur l'identifiant global, pas via window.MESSAGES. Idem pour MESSAGES_EN.
+  let subject, label, templates;
+  if (lang === "en") {
+    label = STEP_LABEL_EN[stepId] || stepLabel;
+    subject = stepId === "livraison"
+      ? `Your NOTOX board ${ref} is ready! 🤙`
+      : `Your NOTOX board ${ref} – ${label} in progress!`;
+    templates = typeof MESSAGES_EN !== "undefined" ? MESSAGES_EN : null;
+  } else {
+    label = stepLabel;
+    subject = stepId === "livraison"
+      ? `Commande NOTOX ${ref} – prête !`
+      : `Commande NOTOX ${ref} – ${stepLabel} en cours !`;
+    templates = typeof MESSAGES !== "undefined" ? MESSAGES : null;
+  }
+
+  const template = templates ? (templates[stepId] || templates.default) : null;
+  const body = template ? template(firstName, ref, label, progress) : "";
   return { subject, body };
 }
 
@@ -1471,7 +1513,8 @@ function openClientMessageModal(order, stepLabel, stepId, progress) {
   const partnerEmail = order.partner_detail?.email || "";
   if (!partnerId) { showToast("⚠ Client sans ID Odoo"); return; }
 
-  const { subject, body } = buildClientMessageDefaults(order, stepLabel, stepId, progress);
+  let lang = "fr"; // état local de la modal — switch instantané au clic
+  const { subject, body } = buildClientMessageDefaults(order, stepLabel, stepId, progress, lang);
   const photos = []; // [{ name, data, dataUrl }]
 
   const lastSentIso = stepId ? S.meta[order.id]?.emails_sent?.[stepId] : null;
@@ -1495,6 +1538,14 @@ function openClientMessageModal(order, stepLabel, stepId, progress) {
       </div>
       <div class="modal-body">
         ${lastSentBanner}
+        <div class="lang-toggle-row">
+          <span class="lang-label active" id="lang-label-fr">🇫🇷 FR</span>
+          <label class="lang-switch" title="Langue du message">
+            <input type="checkbox" id="lang-toggle">
+            <span class="lang-slider"></span>
+          </label>
+          <span class="lang-label" id="lang-label-en">EN 🇬🇧</span>
+        </div>
         <div>
           <label class="field-label" for="msg-subject">Sujet</label>
           <input id="msg-subject" class="field-input" type="text" value="${escapeHtml(subject)}">
@@ -1526,6 +1577,17 @@ function openClientMessageModal(order, stepLabel, stepId, progress) {
   const sendBtn   = overlay.querySelector("#msg-send");
   const subjectEl = overlay.querySelector("#msg-subject");
   const bodyEl    = overlay.querySelector("#msg-body");
+  const langToggle = overlay.querySelector("#lang-toggle");
+  const langFrLabel = overlay.querySelector("#lang-label-fr");
+  const langEnLabel = overlay.querySelector("#lang-label-en");
+  langToggle.addEventListener("change", () => {
+    lang = langToggle.checked ? "en" : "fr";
+    langFrLabel.classList.toggle("active", lang === "fr");
+    langEnLabel.classList.toggle("active", lang === "en");
+    const next = buildClientMessageDefaults(order, stepLabel, stepId, progress, lang);
+    subjectEl.value = next.subject;
+    bodyEl.value    = next.body;
+  });
 
   function renderThumbs() {
     const full = photos.length >= MAX_PHOTOS;
