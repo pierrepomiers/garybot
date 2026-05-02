@@ -2071,20 +2071,25 @@ function renderCalcModal(overlay, catalog, typesOrder, close) {
   coordsToggle.addEventListener("click", () => setCoordsOpen(coordsBody.hidden));
 
   // Reflète l'état des coordonnées via la pastille du toggle.
-  // empty (rouge) : email manquant/invalide
-  // partial (orange) : email valide mais ni prénom/nom ni téléphone
-  // complete (vert) : email valide + au moins un autre champ
+  // Critère minimum : un canal de contact (email OU téléphone) — cohérent
+  // avec le fait que SMS ne nécessite pas d'email, et Mail/Odoo pas de téléphone.
+  // empty (rouge) : ni email ni téléphone valides
+  // partial (orange) : un seul des deux canaux saisi
+  // complete (vert) : email + téléphone tous deux valides
   function updateCoordsStatus() {
     if (!coordsStatusDot) return;
-    const hasValidEmail = isEmailValid(coords.email);
-    const hasNameOrPhone = !!(coords.firstname || coords.lastname || coords.phone);
+    const hasEmail = isEmailValid(coords.email);
+    const hasPhone = isPhoneValid(coords.phone);
     let status, title;
-    if (!hasValidEmail) {
-      status = "empty"; title = "Coordonnées requises";
-    } else if (!hasNameOrPhone) {
-      status = "partial"; title = "Coordonnées partiellement renseignées";
-    } else {
+    if (!hasEmail && !hasPhone) {
+      status = "empty"; title = "Email ou téléphone requis";
+    } else if (hasEmail && hasPhone) {
       status = "complete"; title = "Coordonnées complètes";
+    } else {
+      status = "partial";
+      title = hasEmail
+        ? "Email saisi (téléphone optionnel)"
+        : "Téléphone saisi (email optionnel)";
     }
     coordsStatusDot.dataset.status = status;
     coordsStatusDot.title = title;
