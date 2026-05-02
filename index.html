@@ -2025,8 +2025,12 @@ function renderCalcModal(overlay, catalog, typesOrder, close) {
     if (buildFullMessage() === null) return; // bouton désactivé tant que total <= 0
     // On passe la fonction (et non le texte pré-construit) pour pouvoir
     // re-générer le body avec la ligne « Vos coordonnées » dès que l'email
-    // ou le téléphone change dans la sous-modal.
-    openCalcEmailModal(buildFullMessage);
+    // ou le téléphone change dans la sous-modal. getTotal permet au backend
+    // de créer l'opportunité Odoo avec le bon expected_revenue.
+    openCalcEmailModal({
+      buildBody: buildFullMessage,
+      getTotal: () => buildLines().total,
+    });
   });
 
   smsBtn.addEventListener("click", () => {
@@ -2041,7 +2045,7 @@ function renderCalcModal(overlay, catalog, typesOrder, close) {
 
 // Sous-modal de composition email pour le devis. Pas de body-lock supplémentaire :
 // la modal calculatrice parente a déjà verrouillé le scroll body.
-function openCalcEmailModal(buildBody) {
+function openCalcEmailModal({ buildBody, getTotal }) {
   // Sujet auto-syncé sur l'email du client tant qu'il n'a pas été édité à la main.
   const SUBJECT_PREFIX = "🚨 Devis NOTOX 🚨 - ";
   const initialBody = buildBody("");
@@ -2148,6 +2152,8 @@ function openCalcEmailModal(buildBody) {
     sendBtn.disabled = true;
     sendBtn.innerHTML = `<span class="spinner-xs"></span> Envoi…`;
     try {
+      const phone = phoneEl.value.trim();
+      const quoteTotal = getTotal ? getTotal() : null;
       const resp = await fetch(`${CONFIG.backendUrl}/send-quote`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-api-secret": CONFIG.apiSecret },
@@ -2156,15 +2162,25 @@ function openCalcEmailModal(buildBody) {
           cc: ["contact@notoxsurf.com"],
           subject,
           body_text: finalBody,
+          // Modal devis n'a pas de champ « nom du client » : on laisse null,
+          // le backend créera le res.partner Odoo avec l'email préfixé 🚨.
+          client_name: null,
+          client_phone: phone || null,
+          quote_total: (typeof quoteTotal === "number" && quoteTotal > 0) ? quoteTotal : null,
+          order_ref: null,
         }),
       });
       if (!resp.ok) {
         const txt = await resp.text().catch(() => "");
         throw new Error(`HTTP ${resp.status}${txt ? " — " + txt.slice(0, 200) : ""}`);
       }
-      await resp.json().catch(() => ({}));
+      const data = await resp.json().catch(() => ({}));
       close();
-      showToast("✓ Devis envoyé");
+      if (data && data.opportunity_error) {
+        showToast("⚠ Devis envoyé. Opportunité Odoo non créée (à faire manuellement)", 5000);
+      } else {
+        showToast("✓ Devis envoyé");
+      }
     } catch (err) {
       console.error(err);
       sendBtn.disabled = false;
