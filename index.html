@@ -2220,6 +2220,29 @@ function renderCalcModal(overlay, catalog, typesOrder, close) {
     return out.join("\n");
   }
 
+  // SMS court : pas de séparateurs, pas de coordonnées (le destinataire les connaît),
+  // signature minimaliste. buildFullMessage reste utilisé tel quel pour le mail.
+  function buildSmsMessage(c = {}) {
+    const isEN = c.lang === "en";
+    const { total, lines } = buildLines(isEN ? "en" : "fr");
+    if (total <= 0) return null;
+    const greeting = c.firstname
+      ? (isEN ? `Hello ${c.firstname},` : `Bonjour ${c.firstname},`)
+      : (isEN ? "Hello," : "Bonjour,");
+    const introTitle = isEN ? "NOTOX quote recap:" : "Récap devis NOTOX :";
+    const totalLabel = isEN ? "TOTAL:" : "TOTAL :";
+    const closing    = isEN ? "Talk soon. 🤙\nNOTOX" : "À très vite. 🤙\nNOTOX";
+    return [
+      greeting,
+      "",
+      introTitle,
+      ...lines,
+      `${totalLabel} ${fmtEuro(total)}`,
+      "",
+      closing,
+    ].join("\n");
+  }
+
   // Sujet par défaut du mail. Choisit le « who » dans cet ordre : Prénom Nom > email > 'client'.
   // Préfixe localisé selon coords.lang.
   function buildSubject(c = {}) {
@@ -2283,7 +2306,7 @@ function renderCalcModal(overlay, catalog, typesOrder, close) {
     if (buildFullMessage(coords) === null) return;
     if (!requireCoord("phone", "Téléphone manquant")) return;
     openCalcSmsConfirm({
-      buildBody: buildFullMessage,
+      buildBody: buildSmsMessage,
       getTotal: () => buildLines().total,
       coords,
     });
