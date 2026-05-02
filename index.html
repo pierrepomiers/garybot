@@ -503,6 +503,52 @@ header {
   background:rgba(245,158,11,.15); color:#fcd34d; border-color:rgba(245,158,11,.4);
 }
 .btn-calc-sms:hover:not(:disabled) { background:rgba(245,158,11,.25); }
+.btn-calc-odoo {
+  background:rgba(168,85,247,.15); color:#d8b4fe; border-color:rgba(168,85,247,.4);
+}
+.btn-calc-odoo:hover:not(:disabled) { background:rgba(168,85,247,.25); }
+
+/* Bloc Coordonnées client (collapsible) dans le calc card */
+.calc-coords {
+  margin:14px 0; border:1px solid var(--border); border-radius:8px; overflow:hidden;
+  background:var(--bg3);
+}
+.calc-coords-toggle {
+  width:100%; display:flex; align-items:center; gap:10px;
+  padding:11px 14px; background:var(--bg3); border:none;
+  color:var(--text); font-family:var(--mono); font-size:13px;
+  cursor:pointer; text-align:left;
+}
+.calc-coords-toggle:hover { background:rgba(255,255,255,.04); }
+.coords-chevron { transition:transform .2s; display:inline-block; font-size:10px; color:var(--muted); flex-shrink:0; }
+.calc-coords.open .coords-chevron { transform:rotate(90deg); }
+.coords-label { flex:0 0 auto; }
+.coords-summary {
+  flex:1 1 auto; color:var(--muted); font-size:12px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding-left:8px;
+  text-align:right; min-width:0;
+}
+.calc-coords-body {
+  padding:10px 14px 14px; display:flex; flex-direction:column; gap:10px;
+  background:var(--bg2); border-top:1px solid var(--border);
+}
+.coords-row { display:flex; gap:10px; }
+.coords-row .coords-field { flex:1; min-width:0; }
+.coords-field { display:flex; flex-direction:column; gap:4px; min-width:0; }
+.coords-field label { font-size:11px; color:var(--muted); font-family:var(--mono); }
+.coords-field input {
+  padding:8px 10px; background:var(--bg3); border:1px solid var(--border);
+  border-radius:6px; color:var(--text); font-family:var(--sans); font-size:13px;
+  outline:none; width:100%;
+}
+.coords-field input:focus { border-color:rgba(59,130,246,.45); }
+
+/* Slim modals canaux : récap readonly */
+.slim-recap { background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 14px; }
+.slim-recap-row { display:flex; justify-content:space-between; gap:12px; padding:5px 0; font-size:13px; align-items:baseline; }
+.slim-recap-row + .slim-recap-row { border-top:1px dashed var(--border); }
+.slim-recap-label { color:var(--muted); font-family:var(--mono); font-size:11px; text-transform:uppercase; letter-spacing:.04em; flex-shrink:0; }
+.slim-recap-value { color:var(--text); text-align:right; word-break:break-word; }
 
 /* ── NAV BADGE ── */
 .nav-badge {
@@ -1788,11 +1834,28 @@ const TYPE_LABELS = {
   "speciality":    "Spécialité",
 };
 
+// Traductions EN des types du CSV. Mêmes clés que TYPE_LABELS — utilisées par
+// buildLines(lang) pour générer le devis en anglais quand coords.lang === 'en'.
+const TYPE_LABELS_EN = {
+  "model":         "Model",
+  "size":          "Size",
+  "construction":  "Construction",
+  "shape options": "Shape options",
+  "fins setup":    "Fins setup",
+  "deco":          "Artwork",
+  "leash":         "Leash",
+  "fins":          "Fins",
+  "boardbag":      "Boardbag",
+  "pad":           "Tail pad",
+  "speciality":    "Speciality",
+};
+
 // Types dont les options ne montrent pas de prix dans le <select> (et qui ne contribuent
 // pas au total — déjà garanti par price=null en CSV pour 'model').
 const TYPES_NO_PRICE_DISPLAY = new Set(["model"]);
 
-function labelForType(type) {
+function labelForType(type, lang = "fr") {
+  if (lang === "en") return TYPE_LABELS_EN[type] || TYPE_LABELS[type] || (type.charAt(0).toUpperCase() + type.slice(1));
   return TYPE_LABELS[type] || (type.charAt(0).toUpperCase() + type.slice(1));
 }
 
@@ -1864,6 +1927,48 @@ function renderCalcModal(overlay, catalog, typesOrder, close) {
     <div class="modal-body" id="calc-body">
       ${FIELDS.map(renderField).join("")}
 
+      <div class="calc-coords" id="calc-coords">
+        <button type="button" class="calc-coords-toggle" id="coords-toggle"
+                aria-expanded="false" aria-controls="coords-body">
+          <span class="coords-chevron" aria-hidden="true">▶</span>
+          <span class="coords-label">Coordonnées client</span>
+          <span class="coords-summary" id="coords-summary">(vide)</span>
+        </button>
+        <div class="calc-coords-body" id="coords-body" hidden>
+          <div class="coords-row">
+            <div class="coords-field">
+              <label for="coords-firstname">Prénom</label>
+              <input type="text" id="coords-firstname" autocomplete="given-name">
+            </div>
+            <div class="coords-field">
+              <label for="coords-lastname">Nom</label>
+              <input type="text" id="coords-lastname" autocomplete="family-name">
+            </div>
+          </div>
+          <div class="coords-field">
+            <label for="coords-email">Email</label>
+            <input type="email" id="coords-email" autocomplete="email"
+                   inputmode="email" placeholder="client@example.com">
+          </div>
+          <div class="coords-field">
+            <label for="coords-phone">Téléphone</label>
+            <input type="tel" id="coords-phone" autocomplete="tel"
+                   inputmode="tel" placeholder="06 12 34 56 78">
+          </div>
+          <div class="coords-field">
+            <label for="coords-lang-toggle">Langue du client</label>
+            <div class="lang-toggle-row" style="justify-content:flex-start;">
+              <span class="lang-label active" id="coords-lang-fr">🇫🇷 FR</span>
+              <label class="lang-switch" title="Langue du client">
+                <input type="checkbox" id="coords-lang-toggle">
+                <span class="lang-slider"></span>
+              </label>
+              <span class="lang-label" id="coords-lang-en">EN 🇬🇧</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div>
         <button type="button" class="calc-detail-toggle" id="calc-detail-toggle">▸ Détail du calcul</button>
         <div class="calc-detail hidden" id="calc-detail"></div>
@@ -1879,8 +1984,9 @@ function renderCalcModal(overlay, catalog, typesOrder, close) {
       </div>
       <div style="display:flex; gap:8px; width:100%;">
         <button class="btn-modal-send btn-calc-copy" id="calc-copy" style="flex:1;">📋 Copier</button>
-        <button class="btn-modal-send" id="calc-email" style="flex:1;">📧 Email</button>
+        <button class="btn-modal-send" id="calc-email" style="flex:1;">📧 Mail</button>
         <button class="btn-modal-send btn-calc-sms" id="calc-sms" style="flex:1;">💬 SMS</button>
+        <button class="btn-modal-send btn-calc-odoo" id="calc-odoo" style="flex:1;">🟣 Odoo</button>
       </div>
     </div>`);
 
@@ -1891,6 +1997,63 @@ function renderCalcModal(overlay, catalog, typesOrder, close) {
   const copyBtn      = card.querySelector("#calc-copy");
   const emailBtn     = card.querySelector("#calc-email");
   const smsBtn       = card.querySelector("#calc-sms");
+  const odooBtn      = card.querySelector("#calc-odoo");
+
+  // ── Bloc Coordonnées client (collapsible, session-only) ───────────────────
+  // State partagé par tous les canaux : saisi une fois ici, consommé par les
+  // 3 slim modals (Mail / SMS / Odoo). Pas de persistance Supabase/localStorage.
+  const coords = { firstname: "", lastname: "", email: "", phone: "", lang: "fr" };
+  const coordsBlock   = card.querySelector("#calc-coords");
+  const coordsToggle  = card.querySelector("#coords-toggle");
+  const coordsBody    = card.querySelector("#coords-body");
+  const coordsSummary = card.querySelector("#coords-summary");
+  const coordsInputs  = {
+    firstname: card.querySelector("#coords-firstname"),
+    lastname:  card.querySelector("#coords-lastname"),
+    email:     card.querySelector("#coords-email"),
+    phone:     card.querySelector("#coords-phone"),
+  };
+  const langToggle  = card.querySelector("#coords-lang-toggle");
+  const langFrLabel = card.querySelector("#coords-lang-fr");
+  const langEnLabel = card.querySelector("#coords-lang-en");
+
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const isEmailValid = (s) => EMAIL_RE.test((s || "").trim());
+  const isPhoneValid = (s) => (s || "").replace(/[^\d]/g, "").length >= 6;
+  const fullName = (c) => [c.firstname, c.lastname].filter(Boolean).join(" ").trim();
+  function formatCoordsSummary(c) {
+    if (!c.firstname && !c.lastname && !c.email && !c.phone) return "(vide)";
+    const name = fullName(c);
+    const contact = c.email || c.phone || "";
+    const flag = c.lang === "en" ? "🇬🇧" : "🇫🇷";
+    return [name, contact, flag].filter(Boolean).join(" · ");
+  }
+
+  function setCoordsOpen(open) {
+    coordsBlock.classList.toggle("open", open);
+    coordsBody.hidden = !open;
+    coordsToggle.setAttribute("aria-expanded", String(open));
+    if (open) {
+      const firstEmpty = ["firstname", "lastname", "email", "phone"]
+        .find(k => !coordsInputs[k].value.trim());
+      if (firstEmpty) setTimeout(() => coordsInputs[firstEmpty].focus(), 30);
+    }
+  }
+  coordsToggle.addEventListener("click", () => setCoordsOpen(coordsBody.hidden));
+
+  for (const [k, el] of Object.entries(coordsInputs)) {
+    el.addEventListener("input", () => {
+      coords[k] = el.value;
+      coordsSummary.textContent = formatCoordsSummary(coords);
+    });
+  }
+
+  langToggle.addEventListener("change", (e) => {
+    coords.lang = e.target.checked ? "en" : "fr";
+    langFrLabel.classList.toggle("active", coords.lang === "fr");
+    langEnLabel.classList.toggle("active", coords.lang === "en");
+    coordsSummary.textContent = formatCoordsSummary(coords);
+  });
 
   // Re-bind close sur les boutons ajoutés après render
   card.querySelectorAll("[data-close]").forEach(b => b.addEventListener("click", close));
@@ -1900,23 +2063,26 @@ function renderCalcModal(overlay, catalog, typesOrder, close) {
   //  - 'shape options' est multi-sélection → une ligne par option cochée.
   //  - 'speciality' : prix toujours compté dans le total, mais ligne masquée du devis
   //    si le modèle sélectionné n'est pas 'OTHER' (comparaison robuste casse/espaces).
-  function buildLines() {
+  function buildLines(lang = "fr") {
+    // Convention typographique : FR = espace avant les ":" ; EN = pas d'espace.
+    const sep = lang === "en" ? ": " : " : ";
     const lines = [];
     let total = 0;
     const modelName = (sel.model?.name || "").trim().toUpperCase();
     const showSpeciality = modelName === "OTHER";
-    const pushItemLine = (label, item) => {
+    const pushItemLine = (typeKey, item) => {
+      const label = labelForType(typeKey, lang);
       if (item.price != null) {
-        lines.push(`${label} : ${item.name} — ${fmtEuro(item.price)}`);
+        lines.push(`${label}${sep}${item.name} — ${fmtEuro(item.price)}`);
       } else {
-        lines.push(`${label} : ${item.name}`);
+        lines.push(`${label}${sep}${item.name}`);
       }
     };
     for (const f of FIELDS) {
       if (f.key === "shape options") {
         for (const item of (sel[f.key] || [])) {
           if (item.price != null) total += item.price;
-          pushItemLine(f.label, item);
+          pushItemLine(f.key, item);
         }
         continue;
       }
@@ -1924,7 +2090,7 @@ function renderCalcModal(overlay, catalog, typesOrder, close) {
       if (!item) continue;
       if (item.price != null) total += item.price;
       if (f.key === "speciality" && !showSpeciality) continue;
-      pushItemLine(f.label, item);
+      pushItemLine(f.key, item);
     }
     return { total, lines };
   }
@@ -1939,6 +2105,7 @@ function renderCalcModal(overlay, catalog, typesOrder, close) {
     copyBtn.disabled  = !hasTotal;
     emailBtn.disabled = !hasTotal;
     smsBtn.disabled   = !hasTotal;
+    odooBtn.disabled  = !hasTotal;
     return { total, lines, hasTotal };
   }
 
@@ -1967,14 +2134,26 @@ function renderCalcModal(overlay, catalog, typesOrder, close) {
     detailToggle.textContent = hidden ? "▸ Détail du calcul" : "▾ Détail du calcul";
   });
 
-  // coordsLine optionnelle, insérée dans le template juste après l'en-tête DEVIS NOTOX.
-  // Vide → pas de ligne « Vos coordonnées » (cas copier/SMS où l'email n'est pas connu).
-  function buildFullMessage(coordsLine = "") {
-    const { total, lines } = buildLines();
+  // Construit le body texte du devis depuis l'objet coords. Route selon coords.lang.
+  // Conventions EN : reprises de MESSAGES_EN (« Hello », « Talk soon », « The NOTOX team 🤙 »).
+  function buildFullMessage(c = {}) {
+    return c.lang === "en" ? buildFullMessageEN(c) : buildFullMessageFR(c);
+  }
+
+  function buildFullMessageFR(c = {}) {
+    const { total, lines } = buildLines("fr");
     if (total <= 0) return null;
     const RULE = "─────────────────────────";
+    const greeting = c.firstname ? `Bonjour ${c.firstname},` : "Bonjour,";
+    const coordsBits = [];
+    const name = fullName(c);
+    if (name) coordsBits.push(name);
+    if (c.email) coordsBits.push(c.email);
+    if (c.phone) coordsBits.push(c.phone);
+    const coordsLine = coordsBits.length ? `Vos coordonnées : ${coordsBits.join(" — ")}` : "";
+
     const out = [
-      "Bonjour,",
+      greeting,
       "",
       "Merci pour votre visite à l'atelier. Voici pour mémoire l'estimation de prix de votre projet de planche :",
       "",
@@ -1996,6 +2175,51 @@ function renderCalcModal(overlay, catalog, typesOrder, close) {
     return out.join("\n");
   }
 
+  function buildFullMessageEN(c = {}) {
+    const { total, lines } = buildLines("en");
+    if (total <= 0) return null;
+    const RULE = "─────────────────────────";
+    const greeting = c.firstname ? `Hello ${c.firstname},` : "Hello,";
+    const coordsBits = [];
+    const name = fullName(c);
+    if (name) coordsBits.push(name);
+    if (c.email) coordsBits.push(c.email);
+    if (c.phone) coordsBits.push(c.phone);
+    const coordsLine = coordsBits.length ? `Your contact details: ${coordsBits.join(" — ")}` : "";
+
+    const out = [
+      greeting,
+      "",
+      "Thanks for visiting the workshop. Here's a recap of your board project:",
+      "",
+      "────── NOTOX QUOTE ──────",
+    ];
+    if (coordsLine) out.push(coordsLine);
+    out.push(
+      ...lines,
+      RULE,
+      `TOTAL: ${fmtEuro(total)}`,
+      RULE,
+      "",
+      "Thanks for your interest in our craft.",
+      "Feel free to reach out anytime.",
+      "",
+      "Talk soon,",
+      "The NOTOX team 🤙",
+    );
+    return out.join("\n");
+  }
+
+  // Sujet par défaut du mail. Choisit le « who » dans cet ordre : Prénom Nom > email > 'client'.
+  // Préfixe localisé selon coords.lang.
+  function buildSubject(c = {}) {
+    const name = fullName(c);
+    const who = name || c.email || (c.lang === "en" ? "client" : "client");
+    return c.lang === "en"
+      ? `🚨 NOTOX Quote 🚨 - ${who}`
+      : `🚨 Devis NOTOX 🚨 - ${who}`;
+  }
+
   function openExternalLink(url) {
     const a = document.createElement("a");
     a.href = url;
@@ -2005,9 +2229,22 @@ function renderCalcModal(overlay, catalog, typesOrder, close) {
     a.remove();
   }
 
+  // Si une coordonnée requise pour le canal manque, on ouvre le bloc Coordonnées
+  // et on focus le champ fautif. Retourne true si ok, false sinon.
+  function requireCoord(field, msg) {
+    const value = coords[field] || "";
+    const ok = field === "email" ? isEmailValid(value) : isPhoneValid(value);
+    if (ok) return true;
+    showToast("⚠ " + msg);
+    setCoordsOpen(true);
+    setTimeout(() => coordsInputs[field]?.focus(), 50);
+    return false;
+  }
+
   copyBtn.addEventListener("click", async () => {
-    const text = buildFullMessage();
-    if (!text) return; // bouton désactivé tant que total <= 0
+    // Copier n'a aucun pré-requis : utile pour un devis "rapide" sans coords.
+    const text = buildFullMessage(coords);
+    if (!text) return;
     try {
       await navigator.clipboard.writeText(text);
       showToast("✓ Devis copié");
@@ -2022,72 +2259,50 @@ function renderCalcModal(overlay, catalog, typesOrder, close) {
   });
 
   emailBtn.addEventListener("click", () => {
-    if (buildFullMessage() === null) return; // bouton désactivé tant que total <= 0
-    // On passe la fonction (et non le texte pré-construit) pour pouvoir
-    // re-générer le body avec la ligne « Vos coordonnées » dès que l'email
-    // ou le téléphone change dans la sous-modal. getTotal permet au backend
-    // de créer l'opportunité Odoo avec le bon expected_revenue.
-    openCalcEmailModal({
+    if (buildFullMessage(coords) === null) return;
+    if (!requireCoord("email", "Email manquant ou invalide")) return;
+    openCalcMailConfirm({
       buildBody: buildFullMessage,
+      buildSubject,
       getTotal: () => buildLines().total,
+      coords,
     });
   });
 
   smsBtn.addEventListener("click", () => {
-    const text = buildFullMessage();
-    if (!text) return; // bouton désactivé tant que total <= 0
-    // sms:?body=... est compatible iOS et Android modernes
-    openExternalLink(`sms:?&body=${encodeURIComponent(text)}`);
+    if (buildFullMessage(coords) === null) return;
+    if (!requireCoord("phone", "Téléphone manquant")) return;
+    openCalcSmsConfirm({
+      buildBody: buildFullMessage,
+      getTotal: () => buildLines().total,
+      coords,
+    });
+  });
+
+  odooBtn.addEventListener("click", () => {
+    if (buildFullMessage(coords) === null) return;
+    if (!requireCoord("email", "Email manquant ou invalide")) return;
+    openCalcOdooConfirm({
+      buildBody: buildFullMessage,
+      getTotal: () => buildLines().total,
+      coords,
+    });
   });
 
   recompute();
 }
 
-// Sous-modal de composition email pour le devis. Pas de body-lock supplémentaire :
-// la modal calculatrice parente a déjà verrouillé le scroll body.
-function openCalcEmailModal({ buildBody, getTotal }) {
-  // Sujet auto-syncé sur l'email du client tant qu'il n'a pas été édité à la main.
-  const SUBJECT_PREFIX = "🚨 Devis NOTOX 🚨 - ";
-  const initialBody = buildBody("");
+// ── Slim modals canaux (Mail / SMS / Odoo) ───────────────────────────────────
+// Toutes les coords (email, phone, prénom, nom) viennent du bloc Coordonnées du
+// calc card et sont passées en read-only ici — édition uniquement du sujet/body
+// pour Mail. Pas de body-lock supplémentaire : le calc card parent verrouille
+// déjà le scroll.
+
+// Helper commun : crée l'overlay, gère close + Escape + clic-extérieur.
+function _openSlimModal(innerHtml) {
   const overlay = document.createElement("div");
   overlay.className = "modal-overlay";
-  overlay.innerHTML = `
-    <div class="modal-card" role="dialog" aria-modal="true">
-      <div class="modal-header">
-        <div class="modal-title">
-          <span class="modal-title-icon" aria-hidden="true">📧</span>
-          <span class="modal-title-text"><span>Envoyer le devis</span></span>
-        </div>
-        <button class="modal-close" data-close aria-label="Fermer">×</button>
-      </div>
-      <div class="modal-body">
-        <div>
-          <label class="field-label" for="qm-to">Email du client</label>
-          <input id="qm-to" class="field-input" type="email" placeholder="prenom.nom@exemple.com" autocomplete="email" inputmode="email">
-        </div>
-        <div class="modal-info-banner" style="background:rgba(100,116,139,.14); border-color:rgba(100,116,139,.3); color:var(--text);">
-          📋 En copie automatique : <b>contact@notoxsurf.com</b>
-        </div>
-        <div>
-          <label class="field-label" for="qm-phone">Téléphone client</label>
-          <input id="qm-phone" class="field-input" type="tel" inputmode="tel" placeholder="06 12 34 56 78" autocomplete="tel">
-        </div>
-        <div>
-          <label class="field-label" for="qm-subject">Sujet</label>
-          <input id="qm-subject" class="field-input" type="text" value="${escapeHtml(SUBJECT_PREFIX.trimEnd())}">
-        </div>
-        <div>
-          <label class="field-label" for="qm-body">Message</label>
-          <textarea id="qm-body" class="field-textarea" spellcheck="true" style="min-height:280px;">${escapeHtml(initialBody)}</textarea>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn-modal-cancel" data-close>Annuler</button>
-        <button class="btn-modal-send" id="qm-create-opp">📥 Créer opportunité Odoo</button>
-        <button class="btn-modal-send" id="qm-send">📨 Envoyer</button>
-      </div>
-    </div>`;
-
+  overlay.innerHTML = innerHtml;
   document.body.appendChild(overlay);
 
   function close() {
@@ -2099,56 +2314,61 @@ function openCalcEmailModal({ buildBody, getTotal }) {
   overlay.querySelectorAll("[data-close]").forEach(b => b.addEventListener("click", close));
   overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
 
-  const toEl      = overlay.querySelector("#qm-to");
-  const phoneEl   = overlay.querySelector("#qm-phone");
-  const subjectEl = overlay.querySelector("#qm-subject");
-  const bodyEl    = overlay.querySelector("#qm-body");
-  const sendBtn   = overlay.querySelector("#qm-send");
-  const oppBtn    = overlay.querySelector("#qm-create-opp");
+  return { overlay, close };
+}
 
-  // Construit la ligne « Vos coordonnées » à partir de l'état courant des champs.
-  // Vide si email vide → buildBody("") n'insère rien dans le template.
-  function currentCoordsLine() {
-    const email = toEl.value.trim();
-    if (!email) return "";
-    const phone = phoneEl.value.trim();
-    return phone ? `Vos coordonnées : ${email} — ${phone}` : `Vos coordonnées : ${email}`;
-  }
+function openCalcMailConfirm({ buildBody, buildSubject, getTotal, coords }) {
+  const total       = getTotal();
+  const initialBody = buildBody(coords);
+  const initialSubj = buildSubject(coords);
+  const recipient   = [fullNameOf(coords), `<${coords.email}>`].filter(Boolean).join(" ").trim();
 
-  // Auto-sync sujet ← email + téléphone tant que l'utilisateur n'a pas édité le sujet à la main.
-  let subjectAuto = true;
-  subjectEl.addEventListener("input", () => { subjectAuto = false; });
-  function syncSubject() {
-    if (!subjectAuto) return;
-    const email = toEl.value.trim();
-    const phone = phoneEl.value.trim();
-    const base = email ? SUBJECT_PREFIX + email : SUBJECT_PREFIX.trimEnd();
-    subjectEl.value = phone ? `${base} — ${phone}` : base;
-  }
+  const { overlay, close } = _openSlimModal(`
+    <div class="modal-card" role="dialog" aria-modal="true">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span class="modal-title-icon" aria-hidden="true">📨</span>
+          <span class="modal-title-text"><span>Envoyer le devis par mail</span></span>
+        </div>
+        <button class="modal-close" data-close aria-label="Fermer">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="slim-recap">
+          <div class="slim-recap-row">
+            <span class="slim-recap-label">Devis</span>
+            <span class="slim-recap-value">${escapeHtml(fmtEuro(total))}</span>
+          </div>
+          <div class="slim-recap-row">
+            <span class="slim-recap-label">À</span>
+            <span class="slim-recap-value">${escapeHtml(recipient)}</span>
+          </div>
+        </div>
+        <div class="modal-info-banner" style="background:rgba(100,116,139,.14); border-color:rgba(100,116,139,.3); color:var(--text);">
+          📋 En copie automatique : <b>contact@notoxsurf.com</b>
+        </div>
+        <div>
+          <label class="field-label" for="cm-subject">Sujet</label>
+          <input id="cm-subject" class="field-input" type="text" value="${escapeHtml(initialSubj)}">
+        </div>
+        <div>
+          <label class="field-label" for="cm-body">Message</label>
+          <textarea id="cm-body" class="field-textarea" spellcheck="true" style="min-height:280px;">${escapeHtml(initialBody)}</textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-modal-cancel" data-close>Annuler</button>
+        <button class="btn-modal-send" id="cm-send">📨 Envoyer</button>
+      </div>
+    </div>`);
 
-  // Auto-sync body ← email + téléphone (re-build via buildBody pour insérer la ligne
-  // « Vos coordonnées » dans le template). Préserve les édits manuels via bodyAuto.
-  let bodyAuto = true;
-  bodyEl.addEventListener("input", () => { bodyAuto = false; });
-  function syncBody() {
-    if (!bodyAuto) return;
-    bodyEl.value = buildBody(currentCoordsLine());
-  }
-
-  toEl.addEventListener("input", () => { syncSubject(); syncBody(); });
-  phoneEl.addEventListener("input", () => { syncSubject(); syncBody(); });
+  const subjectEl = overlay.querySelector("#cm-subject");
+  const bodyEl    = overlay.querySelector("#cm-body");
+  const sendBtn   = overlay.querySelector("#cm-send");
 
   sendBtn.addEventListener("click", async () => {
-    const to      = toEl.value.trim();
     const subject = subjectEl.value.trim();
-    if (!to)                                          { showToast("⚠ Email destinataire vide"); toEl.focus(); return; }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to))       { showToast("⚠ Email invalide"); toEl.focus(); return; }
-    if (!subject)                                     { showToast("⚠ Sujet vide"); subjectEl.focus(); return; }
-
-    // Body envoyé : si l'utilisateur n'a pas édité la textarea (bodyAuto), on rebuild
-    // proprement à partir du template pour garantir la présence de « Vos coordonnées ».
-    // Sinon on respecte ses édits tels quels.
-    const finalBody = (bodyAuto ? buildBody(currentCoordsLine()) : bodyEl.value).trim();
+    const finalBody = bodyEl.value.trim();
+    if (!subject)   { showToast("⚠ Sujet vide"); subjectEl.focus(); return; }
     if (!finalBody) { showToast("⚠ Message vide"); bodyEl.focus(); return; }
 
     sendBtn.disabled = true;
@@ -2158,7 +2378,7 @@ function openCalcEmailModal({ buildBody, getTotal }) {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-api-secret": CONFIG.apiSecret },
         body: JSON.stringify({
-          to,
+          to: coords.email,
           cc: ["contact@notoxsurf.com"],
           subject,
           body_text: finalBody,
@@ -2179,52 +2399,129 @@ function openCalcEmailModal({ buildBody, getTotal }) {
     }
   });
 
-  // ── Bouton dédié « Créer opportunité Odoo » ─────────────────────────────────
-  // Action explicite et indépendante de l'envoi mail/SMS/copie. Cf prompt 13 :
-  // l'opportunité ne doit plus être créée automatiquement à chaque mail.
-  // State limité à la session de la modal (pas de persistance) : à la fermeture/
-  // réouverture, le bouton redevient cliquable. Pas de déduplication backend.
-  const initialOppLabel = "📥 Créer opportunité Odoo";
-  function refreshOppEnabled() {
-    // Garde inactif si déjà créé (label success) — ne pas réactiver après succès.
-    if (oppBtn.dataset.state === "created") return;
-    const t = (typeof getTotal === "function") ? getTotal() : null;
-    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(toEl.value.trim());
-    oppBtn.disabled = !(typeof t === "number" && t > 0 && emailOk);
-  }
-  refreshOppEnabled();
-  toEl.addEventListener("input", refreshOppEnabled);
+  setTimeout(() => subjectEl?.focus(), 50);
+}
 
-  oppBtn.addEventListener("click", async () => {
-    if (oppBtn.dataset.state === "created") {
-      const url = oppBtn.dataset.leadUrl;
+function openCalcSmsConfirm({ buildBody, getTotal, coords }) {
+  // Pas d'endpoint SMS backend (TODO produit) : on délègue à l'app Messages
+  // du device via sms:?body=... — destinataire pré-rempli si possible.
+  const total = getTotal();
+  const text  = buildBody(coords);
+
+  const { overlay, close } = _openSlimModal(`
+    <div class="modal-card" role="dialog" aria-modal="true">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span class="modal-title-icon" aria-hidden="true">💬</span>
+          <span class="modal-title-text"><span>Envoyer le devis par SMS</span></span>
+        </div>
+        <button class="modal-close" data-close aria-label="Fermer">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="slim-recap">
+          <div class="slim-recap-row">
+            <span class="slim-recap-label">Devis</span>
+            <span class="slim-recap-value">${escapeHtml(fmtEuro(total))}</span>
+          </div>
+          <div class="slim-recap-row">
+            <span class="slim-recap-label">À</span>
+            <span class="slim-recap-value">${escapeHtml(coords.phone || "—")}</span>
+          </div>
+        </div>
+        <div>
+          <label class="field-label" for="cs-body">Message</label>
+          <textarea id="cs-body" class="field-textarea" spellcheck="true" style="min-height:240px;">${escapeHtml(text)}</textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-modal-cancel" data-close>Annuler</button>
+        <button class="btn-modal-send" id="cs-send">💬 Envoyer</button>
+      </div>
+    </div>`);
+
+  const bodyEl  = overlay.querySelector("#cs-body");
+  const sendBtn = overlay.querySelector("#cs-send");
+
+  sendBtn.addEventListener("click", () => {
+    const finalBody = bodyEl.value.trim();
+    if (!finalBody) { showToast("⚠ Message vide"); bodyEl.focus(); return; }
+    // sms:<phone>?body=... pré-remplit le destinataire et le body sur iOS/Android.
+    const phone = (coords.phone || "").replace(/\s+/g, "");
+    const url = phone
+      ? `sms:${encodeURIComponent(phone)}?&body=${encodeURIComponent(finalBody)}`
+      : `sms:?&body=${encodeURIComponent(finalBody)}`;
+    const a = document.createElement("a");
+    a.href = url; a.rel = "noopener";
+    document.body.appendChild(a); a.click(); a.remove();
+    close();
+  });
+}
+
+function openCalcOdooConfirm({ buildBody, getTotal, coords }) {
+  const total = getTotal();
+  // Description envoyée à Odoo : toujours en français quelle que soit coords.lang.
+  // Cohérence interne du CRM (lecture par Pierre, pas par le client).
+  const bodyText = buildBody({ ...coords, lang: "fr" });
+  const name     = fullNameOf(coords);
+
+  const { overlay, close } = _openSlimModal(`
+    <div class="modal-card" role="dialog" aria-modal="true">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span class="modal-title-icon" aria-hidden="true">🟣</span>
+          <span class="modal-title-text"><span>Créer opportunité Odoo</span></span>
+        </div>
+        <button class="modal-close" data-close aria-label="Fermer">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="slim-recap">
+          <div class="slim-recap-row">
+            <span class="slim-recap-label">Devis</span>
+            <span class="slim-recap-value">${escapeHtml(fmtEuro(total))}</span>
+          </div>
+          <div class="slim-recap-row">
+            <span class="slim-recap-label">Client</span>
+            <span class="slim-recap-value">${escapeHtml(name || "—")}</span>
+          </div>
+          <div class="slim-recap-row">
+            <span class="slim-recap-label">Email</span>
+            <span class="slim-recap-value">${escapeHtml(coords.email || "—")}</span>
+          </div>
+          <div class="slim-recap-row">
+            <span class="slim-recap-label">Téléphone</span>
+            <span class="slim-recap-value">${escapeHtml(coords.phone || "—")}</span>
+          </div>
+        </div>
+        <div class="modal-info-banner" style="background:rgba(168,85,247,.12); border-color:rgba(168,85,247,.3); color:var(--text);">
+          🟣 L'opportunité sera créée dans le pipeline CRM Odoo avec ces coordonnées et le total du devis (<b>${escapeHtml(fmtEuro(total))}</b>).
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-modal-cancel" data-close>Annuler</button>
+        <button class="btn-modal-send" id="co-create">🟣 Créer opp.</button>
+      </div>
+    </div>`);
+
+  const createBtn = overlay.querySelector("#co-create");
+  const initialLabel = "🟣 Créer opp.";
+
+  createBtn.addEventListener("click", async () => {
+    if (createBtn.dataset.state === "created") {
+      const url = createBtn.dataset.leadUrl;
       if (url) window.open(url, "_blank", "noopener");
       return;
     }
-    const to = toEl.value.trim();
-    if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
-      showToast("⚠ Email destinataire invalide"); toEl.focus(); return;
-    }
-    const quoteTotal = (typeof getTotal === "function") ? getTotal() : null;
-    if (!(typeof quoteTotal === "number" && quoteTotal > 0)) {
-      showToast("⚠ Total devis invalide"); return;
-    }
-    const phone = phoneEl.value.trim();
-    // Body de référence pour l'opportunité Odoo : on respecte les édits manuels
-    // de la textarea (mêmes règles que pour /send-quote).
-    const bodyText = (bodyAuto ? buildBody(currentCoordsLine()) : bodyEl.value).trim();
-
-    oppBtn.disabled = true;
-    oppBtn.innerHTML = `<span class="spinner-xs"></span> Création…`;
+    createBtn.disabled = true;
+    createBtn.innerHTML = `<span class="spinner-xs"></span> Création…`;
     try {
       const resp = await fetch(`${CONFIG.backendUrl}/create-opportunity`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-api-secret": CONFIG.apiSecret },
         body: JSON.stringify({
-          client_email: to,
-          client_name: null,
-          client_phone: phone || null,
-          quote_total: quoteTotal,
+          client_email: coords.email,
+          client_name: name || null,
+          client_phone: coords.phone || null,
+          quote_total: total,
           quote_body_text: bodyText,
           order_ref: null,
         }),
@@ -2237,29 +2534,31 @@ function openCalcEmailModal({ buildBody, getTotal }) {
       const opp = data && data.opportunity;
       const leadId = opp && opp.lead_id;
       const leadUrl = opp && opp.lead_url;
-      // State succès figé pour la session : bouton vert, devient un raccourci
-      // pour ouvrir l'opportunité créée dans Odoo.
-      oppBtn.dataset.state = "created";
-      if (leadUrl) oppBtn.dataset.leadUrl = leadUrl;
-      oppBtn.disabled = false;
-      oppBtn.innerHTML = leadId
-        ? `✓ Opportunité créée — #${leadId}`
-        : "✓ Opportunité créée";
-      oppBtn.style.background = "rgba(74,222,128,.18)";
-      oppBtn.style.color = "var(--green)";
-      oppBtn.style.borderColor = "rgba(74,222,128,.45)";
-      oppBtn.style.cursor = leadUrl ? "pointer" : "default";
-      oppBtn.title = leadUrl ? "Cliquer pour ouvrir dans Odoo" : "";
+
+      // Modal reste ouverte : permet à l'utilisateur de cliquer le lien CRM.
+      createBtn.dataset.state = "created";
+      if (leadUrl) createBtn.dataset.leadUrl = leadUrl;
+      createBtn.disabled = false;
+      createBtn.innerHTML = leadId ? `✓ Opportunité créée — #${leadId}` : "✓ Opportunité créée";
+      createBtn.style.background = "rgba(74,222,128,.18)";
+      createBtn.style.color = "var(--green)";
+      createBtn.style.borderColor = "rgba(74,222,128,.45)";
+      createBtn.style.cursor = leadUrl ? "pointer" : "default";
+      createBtn.title = leadUrl ? "Cliquer pour ouvrir dans Odoo" : "";
       showToast(leadId ? `✓ Opportunité Odoo créée — lead #${leadId}` : "✓ Opportunité Odoo créée");
     } catch (err) {
       console.error(err);
-      oppBtn.innerHTML = initialOppLabel;
-      refreshOppEnabled();
+      createBtn.disabled = false;
+      createBtn.innerHTML = initialLabel;
       showToast("⚠ Erreur Odoo : " + err.message, 5000);
     }
   });
+}
 
-  setTimeout(() => toEl?.focus(), 50);
+// Helper externe (utilisé par les 3 slim modals) : équivalent du fullName interne
+// au calc card. Dupliqué ici parce que les slim modals sont des fonctions globales.
+function fullNameOf(c) {
+  return [c.firstname, c.lastname].filter(Boolean).join(" ").trim();
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
