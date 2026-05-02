@@ -515,9 +515,12 @@ header {
 }
 .calc-coords-toggle {
   width:100%; display:flex; align-items:center; gap:10px;
+  min-height:44px;
   padding:11px 14px; background:var(--bg3); border:none;
   color:var(--text); font-family:var(--mono); font-size:13px;
+  line-height:1.4;
   cursor:pointer; text-align:left;
+  box-sizing:border-box;
 }
 .calc-coords-toggle:hover { background:rgba(255,255,255,.04); }
 .coords-chevron { transition:transform .2s; display:inline-block; font-size:10px; color:var(--muted); flex-shrink:0; }
