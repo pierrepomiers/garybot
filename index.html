@@ -2083,6 +2083,7 @@ function openCalcEmailModal({ buildBody, getTotal }) {
       </div>
       <div class="modal-footer">
         <button class="btn-modal-cancel" data-close>Annuler</button>
+        <button class="btn-modal-send" id="qm-create-opp">📥 Créer opportunité Odoo</button>
         <button class="btn-modal-send" id="qm-send">📨 Envoyer</button>
       </div>
     </div>`;
@@ -2103,6 +2104,7 @@ function openCalcEmailModal({ buildBody, getTotal }) {
   const subjectEl = overlay.querySelector("#qm-subject");
   const bodyEl    = overlay.querySelector("#qm-body");
   const sendBtn   = overlay.querySelector("#qm-send");
+  const oppBtn    = overlay.querySelector("#qm-create-opp");
 
   // Construit la ligne « Vos coordonnées » à partir de l'état courant des champs.
   // Vide si email vide → buildBody("") n'insère rien dans le template.
@@ -2152,8 +2154,6 @@ function openCalcEmailModal({ buildBody, getTotal }) {
     sendBtn.disabled = true;
     sendBtn.innerHTML = `<span class="spinner-xs"></span> Envoi…`;
     try {
-      const phone = phoneEl.value.trim();
-      const quoteTotal = getTotal ? getTotal() : null;
       const resp = await fetch(`${CONFIG.backendUrl}/send-quote`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-api-secret": CONFIG.apiSecret },
@@ -2162,11 +2162,70 @@ function openCalcEmailModal({ buildBody, getTotal }) {
           cc: ["contact@notoxsurf.com"],
           subject,
           body_text: finalBody,
-          // Modal devis n'a pas de champ « nom du client » : on laisse null,
-          // le backend créera le res.partner Odoo avec l'email préfixé 🚨.
+        }),
+      });
+      if (!resp.ok) {
+        const txt = await resp.text().catch(() => "");
+        throw new Error(`HTTP ${resp.status}${txt ? " — " + txt.slice(0, 200) : ""}`);
+      }
+      await resp.json().catch(() => ({}));
+      close();
+      showToast("✓ Devis envoyé");
+    } catch (err) {
+      console.error(err);
+      sendBtn.disabled = false;
+      sendBtn.innerHTML = "📨 Envoyer";
+      showToast("⚠ Envoi échoué : " + err.message);
+    }
+  });
+
+  // ── Bouton dédié « Créer opportunité Odoo » ─────────────────────────────────
+  // Action explicite et indépendante de l'envoi mail/SMS/copie. Cf prompt 13 :
+  // l'opportunité ne doit plus être créée automatiquement à chaque mail.
+  // State limité à la session de la modal (pas de persistance) : à la fermeture/
+  // réouverture, le bouton redevient cliquable. Pas de déduplication backend.
+  const initialOppLabel = "📥 Créer opportunité Odoo";
+  function refreshOppEnabled() {
+    // Garde inactif si déjà créé (label success) — ne pas réactiver après succès.
+    if (oppBtn.dataset.state === "created") return;
+    const t = (typeof getTotal === "function") ? getTotal() : null;
+    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(toEl.value.trim());
+    oppBtn.disabled = !(typeof t === "number" && t > 0 && emailOk);
+  }
+  refreshOppEnabled();
+  toEl.addEventListener("input", refreshOppEnabled);
+
+  oppBtn.addEventListener("click", async () => {
+    if (oppBtn.dataset.state === "created") {
+      const url = oppBtn.dataset.leadUrl;
+      if (url) window.open(url, "_blank", "noopener");
+      return;
+    }
+    const to = toEl.value.trim();
+    if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+      showToast("⚠ Email destinataire invalide"); toEl.focus(); return;
+    }
+    const quoteTotal = (typeof getTotal === "function") ? getTotal() : null;
+    if (!(typeof quoteTotal === "number" && quoteTotal > 0)) {
+      showToast("⚠ Total devis invalide"); return;
+    }
+    const phone = phoneEl.value.trim();
+    // Body de référence pour l'opportunité Odoo : on respecte les édits manuels
+    // de la textarea (mêmes règles que pour /send-quote).
+    const bodyText = (bodyAuto ? buildBody(currentCoordsLine()) : bodyEl.value).trim();
+
+    oppBtn.disabled = true;
+    oppBtn.innerHTML = `<span class="spinner-xs"></span> Création…`;
+    try {
+      const resp = await fetch(`${CONFIG.backendUrl}/create-opportunity`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-api-secret": CONFIG.apiSecret },
+        body: JSON.stringify({
+          client_email: to,
           client_name: null,
           client_phone: phone || null,
-          quote_total: (typeof quoteTotal === "number" && quoteTotal > 0) ? quoteTotal : null,
+          quote_total: quoteTotal,
+          quote_body_text: bodyText,
           order_ref: null,
         }),
       });
@@ -2175,17 +2234,28 @@ function openCalcEmailModal({ buildBody, getTotal }) {
         throw new Error(`HTTP ${resp.status}${txt ? " — " + txt.slice(0, 200) : ""}`);
       }
       const data = await resp.json().catch(() => ({}));
-      close();
-      if (data && data.opportunity_error) {
-        showToast("⚠ Devis envoyé. Opportunité Odoo non créée (à faire manuellement)", 5000);
-      } else {
-        showToast("✓ Devis envoyé");
-      }
+      const opp = data && data.opportunity;
+      const leadId = opp && opp.lead_id;
+      const leadUrl = opp && opp.lead_url;
+      // State succès figé pour la session : bouton vert, devient un raccourci
+      // pour ouvrir l'opportunité créée dans Odoo.
+      oppBtn.dataset.state = "created";
+      if (leadUrl) oppBtn.dataset.leadUrl = leadUrl;
+      oppBtn.disabled = false;
+      oppBtn.innerHTML = leadId
+        ? `✓ Opportunité créée — #${leadId}`
+        : "✓ Opportunité créée";
+      oppBtn.style.background = "rgba(74,222,128,.18)";
+      oppBtn.style.color = "var(--green)";
+      oppBtn.style.borderColor = "rgba(74,222,128,.45)";
+      oppBtn.style.cursor = leadUrl ? "pointer" : "default";
+      oppBtn.title = leadUrl ? "Cliquer pour ouvrir dans Odoo" : "";
+      showToast(leadId ? `✓ Opportunité Odoo créée — lead #${leadId}` : "✓ Opportunité Odoo créée");
     } catch (err) {
       console.error(err);
-      sendBtn.disabled = false;
-      sendBtn.innerHTML = "📨 Envoyer";
-      showToast("⚠ Envoi échoué : " + err.message);
+      oppBtn.innerHTML = initialOppLabel;
+      refreshOppEnabled();
+      showToast("⚠ Erreur Odoo : " + err.message, 5000);
     }
   });
 
