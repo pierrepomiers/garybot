@@ -462,12 +462,15 @@ header {
 }
 .calc-select:focus { border-color:rgba(59,130,246,.45); }
 .calc-checkbox-group {
-  margin:0; padding:10px 12px;
-  background:var(--bg3); border:1px solid var(--border); border-radius:8px;
-  display:flex; flex-direction:column; gap:8px; min-width:0;
+  margin:0; padding:0; border:none; min-width:0;
+  display:flex; flex-direction:column; gap:6px;
 }
-.calc-checkbox-group legend.field-label {
-  padding:0; margin-bottom:6px; float:left; width:100%;
+.calc-checkbox-group > legend.field-label {
+  padding:0; margin:0 0 6px 0; float:none; width:auto;
+}
+.calc-checkbox-list {
+  background:var(--bg3); border:1px solid var(--border); border-radius:8px;
+  padding:10px 12px; display:flex; flex-direction:column; gap:8px; min-width:0;
 }
 .calc-checkbox-item {
   display:flex; align-items:center; gap:10px; cursor:pointer;
@@ -1917,7 +1920,7 @@ function renderCalcModal(overlay, catalog, typesOrder, close) {
       <div class="calc-section">
         <fieldset class="calc-checkbox-group">
           <legend class="field-label">${escapeHtml(f.label)}</legend>
-          ${checks}
+          <div class="calc-checkbox-list">${checks}</div>
         </fieldset>
       </div>`;
     }
