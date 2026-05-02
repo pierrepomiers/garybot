@@ -529,6 +529,22 @@ header {
 .calc-coords:not(.open) > .calc-coords-toggle { border-radius:7px; }
 .calc-coords-toggle:hover { background:rgba(255,255,255,.04); }
 .coords-chevron { transition:transform .2s; display:inline-block; font-size:10px; color:var(--muted); flex-shrink:0; }
+.coords-status-dot {
+  width:10px; height:10px; border-radius:50%; flex-shrink:0;
+  background:#ef4444; box-shadow:0 0 6px rgba(239,68,68,.5);
+  transition:background .2s, box-shadow .2s;
+}
+.coords-status-dot[data-status="partial"] {
+  background:#f59e0b; box-shadow:0 0 6px rgba(245,158,11,.5);
+}
+.coords-status-dot[data-status="complete"] {
+  background:#10b981; box-shadow:0 0 6px rgba(16,185,129,.5);
+}
+@keyframes coords-flash {
+  0%, 100% { border-color:var(--border); box-shadow:none; }
+  50% { border-color:var(--accent); box-shadow:0 0 0 4px rgba(245,158,11,.25); }
+}
+.calc-coords.flash { animation:coords-flash .6s ease-in-out 2; }
 .calc-coords.open .coords-chevron { transform:rotate(90deg); }
 .coords-label { flex:0 0 auto; }
 .coords-summary {
@@ -1941,6 +1957,8 @@ function renderCalcModal(overlay, catalog, typesOrder, close) {
         <button type="button" class="calc-coords-toggle" id="coords-toggle"
                 aria-expanded="false" aria-controls="coords-body">
           <span class="coords-chevron" aria-hidden="true">▶</span>
+          <span class="coords-status-dot" id="coords-status-dot" data-status="empty"
+                title="Coordonnées requises"></span>
           <span class="coords-label">Coordonnées client</span>
           <span class="coords-summary" id="coords-summary">(vide)</span>
         </button>
@@ -2017,6 +2035,7 @@ function renderCalcModal(overlay, catalog, typesOrder, close) {
   const coordsToggle  = card.querySelector("#coords-toggle");
   const coordsBody    = card.querySelector("#coords-body");
   const coordsSummary = card.querySelector("#coords-summary");
+  const coordsStatusDot = card.querySelector("#coords-status-dot");
   const coordsInputs  = {
     firstname: card.querySelector("#coords-firstname"),
     lastname:  card.querySelector("#coords-lastname"),
@@ -2051,10 +2070,31 @@ function renderCalcModal(overlay, catalog, typesOrder, close) {
   }
   coordsToggle.addEventListener("click", () => setCoordsOpen(coordsBody.hidden));
 
+  // Reflète l'état des coordonnées via la pastille du toggle.
+  // empty (rouge) : email manquant/invalide
+  // partial (orange) : email valide mais ni prénom/nom ni téléphone
+  // complete (vert) : email valide + au moins un autre champ
+  function updateCoordsStatus() {
+    if (!coordsStatusDot) return;
+    const hasValidEmail = isEmailValid(coords.email);
+    const hasNameOrPhone = !!(coords.firstname || coords.lastname || coords.phone);
+    let status, title;
+    if (!hasValidEmail) {
+      status = "empty"; title = "Coordonnées requises";
+    } else if (!hasNameOrPhone) {
+      status = "partial"; title = "Coordonnées partiellement renseignées";
+    } else {
+      status = "complete"; title = "Coordonnées complètes";
+    }
+    coordsStatusDot.dataset.status = status;
+    coordsStatusDot.title = title;
+  }
+
   for (const [k, el] of Object.entries(coordsInputs)) {
     el.addEventListener("input", () => {
       coords[k] = el.value;
       coordsSummary.textContent = formatCoordsSummary(coords);
+      updateCoordsStatus();
     });
   }
 
@@ -2063,7 +2103,9 @@ function renderCalcModal(overlay, catalog, typesOrder, close) {
     langFrLabel.classList.toggle("active", coords.lang === "fr");
     langEnLabel.classList.toggle("active", coords.lang === "en");
     coordsSummary.textContent = formatCoordsSummary(coords);
+    updateCoordsStatus();
   });
+  updateCoordsStatus();
 
   // Re-bind close sur les boutons ajoutés après render
   card.querySelectorAll("[data-close]").forEach(b => b.addEventListener("click", close));
@@ -2105,6 +2147,23 @@ function renderCalcModal(overlay, catalog, typesOrder, close) {
     return { total, lines };
   }
 
+  // Flash ambré du bloc Coordonnées quand le total franchit 0 → positif
+  // ET que les coordonnées ne sont pas complètes. Attire l'œil pile au
+  // moment où le user va naturellement vouloir envoyer le devis.
+  let lastTotalWasZero = true;
+  function maybeFlashCoords(currentTotal) {
+    if (currentTotal > 0 && lastTotalWasZero) {
+      const incomplete = coordsStatusDot && coordsStatusDot.dataset.status !== "complete";
+      if (incomplete) {
+        coordsBlock.classList.remove("flash");
+        void coordsBlock.offsetWidth; // force reflow pour redéclencher l'animation
+        coordsBlock.classList.add("flash");
+        setTimeout(() => coordsBlock.classList.remove("flash"), 1500);
+      }
+    }
+    lastTotalWasZero = currentTotal <= 0;
+  }
+
   function recompute() {
     const { total, lines } = buildLines();
     const hasTotal = total > 0;
@@ -2116,6 +2175,7 @@ function renderCalcModal(overlay, catalog, typesOrder, close) {
     emailBtn.disabled = !hasTotal;
     smsBtn.disabled   = !hasTotal;
     odooBtn.disabled  = !hasTotal;
+    maybeFlashCoords(total);
     return { total, lines, hasTotal };
   }
 
