@@ -510,8 +510,8 @@ header {
 
 /* Bloc Coordonnées client (collapsible) dans le calc card */
 .calc-coords {
-  margin:14px 0; border:1px solid var(--border); border-radius:8px; overflow:hidden;
-  background:var(--bg3);
+  margin:14px 0; border:1px solid var(--border); border-radius:8px;
+  background:var(--bg3); isolation:isolate;
 }
 .calc-coords-toggle {
   width:100%; display:flex; align-items:center; gap:10px;
@@ -521,7 +521,9 @@ header {
   line-height:1.4;
   cursor:pointer; text-align:left;
   box-sizing:border-box;
+  border-radius:7px 7px 0 0;
 }
+.calc-coords:not(.open) > .calc-coords-toggle { border-radius:7px; }
 .calc-coords-toggle:hover { background:rgba(255,255,255,.04); }
 .coords-chevron { transition:transform .2s; display:inline-block; font-size:10px; color:var(--muted); flex-shrink:0; }
 .calc-coords.open .coords-chevron { transform:rotate(90deg); }
@@ -534,6 +536,7 @@ header {
 .calc-coords-body {
   padding:10px 14px 14px; display:flex; flex-direction:column; gap:10px;
   background:var(--bg2); border-top:1px solid var(--border);
+  border-radius:0 0 7px 7px;
 }
 .coords-row { display:flex; gap:10px; }
 .coords-row .coords-field { flex:1; min-width:0; }
