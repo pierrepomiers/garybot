@@ -544,7 +544,7 @@ header {
   0%, 100% { border-color:var(--border); box-shadow:none; }
   50% { border-color:var(--accent); box-shadow:0 0 0 4px rgba(245,158,11,.25); }
 }
-.calc-coords.flash { animation:coords-flash .6s ease-in-out 2; }
+.calc-coords.flashing { animation:coords-flash 1.4s ease-in-out infinite; }
 .calc-coords.open .coords-chevron { transform:rotate(90deg); }
 .coords-label { flex:0 0 auto; }
 .coords-summary {
@@ -2088,6 +2088,7 @@ function renderCalcModal(overlay, catalog, typesOrder, close) {
     }
     coordsStatusDot.dataset.status = status;
     coordsStatusDot.title = title;
+    syncCoordsFlash(buildLines().total);
   }
 
   for (const [k, el] of Object.entries(coordsInputs)) {
@@ -2147,21 +2148,14 @@ function renderCalcModal(overlay, catalog, typesOrder, close) {
     return { total, lines };
   }
 
-  // Flash ambré du bloc Coordonnées quand le total franchit 0 → positif
-  // ET que les coordonnées ne sont pas complètes. Attire l'œil pile au
-  // moment où le user va naturellement vouloir envoyer le devis.
-  let lastTotalWasZero = true;
-  function maybeFlashCoords(currentTotal) {
-    if (currentTotal > 0 && lastTotalWasZero) {
-      const incomplete = coordsStatusDot && coordsStatusDot.dataset.status !== "complete";
-      if (incomplete) {
-        coordsBlock.classList.remove("flash");
-        void coordsBlock.offsetWidth; // force reflow pour redéclencher l'animation
-        coordsBlock.classList.add("flash");
-        setTimeout(() => coordsBlock.classList.remove("flash"), 1500);
-      }
-    }
-    lastTotalWasZero = currentTotal <= 0;
+  // Synchronise l'état du flash : la bordure du bloc Coordonnées clignote
+  // en boucle tant que (total > 0 ET pastille rouge / email manquant).
+  // Appelé à chaque recompute et à chaque update de status, donc le flash
+  // s'arrête immédiatement dès que l'email devient valide.
+  function syncCoordsFlash(currentTotal) {
+    if (!coordsBlock || !coordsStatusDot) return;
+    const shouldFlash = currentTotal > 0 && coordsStatusDot.dataset.status === "empty";
+    coordsBlock.classList.toggle("flashing", shouldFlash);
   }
 
   function recompute() {
@@ -2175,7 +2169,7 @@ function renderCalcModal(overlay, catalog, typesOrder, close) {
     emailBtn.disabled = !hasTotal;
     smsBtn.disabled   = !hasTotal;
     odooBtn.disabled  = !hasTotal;
-    maybeFlashCoords(total);
+    syncCoordsFlash(total);
     return { total, lines, hasTotal };
   }
 
