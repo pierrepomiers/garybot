@@ -4234,9 +4234,9 @@ function bindOrderCards() {
 }
 
 // Modal de création d'un nouveau fournisseur.
-// Scope : crée uniquement la fiche (categories vide). Pour qu'il apparaisse
-// dans un selecteur d'étape, l'utilisateur doit cocher la catégorie
-// (Blank/Preshape/Accessoires) sur la fiche en Réglages.
+// Au moins une catégorie (Blank/Preshape/Accessoires) doit être cochée :
+// elle conditionne dans quel(s) selecteur(s) d'étape le fournisseur apparaît
+// (cf. suppliersForStep).
 function openNewSupplierModal() {
   const overlay = document.createElement("div");
   overlay.className = "modal-overlay";
@@ -4247,7 +4247,7 @@ function openNewSupplierModal() {
           <span class="modal-title-icon" aria-hidden="true">➕</span>
           <span class="modal-title-text">
             <span>Nouveau fournisseur</span>
-            <small>Coche les catégories sur la fiche pour le rendre disponible dans les étapes</small>
+            <small>Coche au moins une catégorie pour le rendre disponible dans les étapes</small>
           </span>
         </div>
         <button class="modal-close" data-close aria-label="Fermer">×</button>
@@ -4260,6 +4260,17 @@ function openNewSupplierModal() {
         <div>
           <label class="field-label" for="ns-email">Email *</label>
           <input id="ns-email" class="field-input" type="email" placeholder="contact@example.com" autocomplete="off" required>
+        </div>
+        <div>
+          <label class="field-label">Catégories *</label>
+          <div class="fo-categories" id="ns-categories">
+            ${SUPPLIER_CATEGORIES.map(cat => `
+              <label class="fo-cat-row">
+                <input type="checkbox" data-ns-cat="${cat.id}">
+                <span>${cat.label}</span>
+              </label>
+            `).join("")}
+          </div>
         </div>
         <div>
           <label class="field-label" for="ns-cc">Cc (optionnel)</label>
@@ -4325,6 +4336,14 @@ function openNewSupplierModal() {
     if (!nameVal)  { showToast("⚠ Nom requis"); nameEl.focus(); return; }
     if (!emailVal || !EMAIL_RE.test(emailVal)) { showToast("⚠ Email invalide"); emailEl.focus(); return; }
 
+    const categoriesArr = Array.from(overlay.querySelectorAll('input[data-ns-cat]:checked'))
+      .map(cb => cb.dataset.nsCat);
+    if (categoriesArr.length === 0) {
+      showToast("⚠ Au moins une catégorie est requise");
+      overlay.querySelector('input[data-ns-cat]')?.focus();
+      return;
+    }
+
     const key = supplierNameToKey(nameVal);
     if (!key) { showToast("⚠ Nom invalide"); nameEl.focus(); return; }
     if (S.suppliersByKey[key]) {
@@ -4341,6 +4360,7 @@ function openNewSupplierModal() {
       contact_nom: contactVal,
       phone: phoneVal,
       notes: notesVal,
+      categories: categoriesArr,
       delai_livraison_jours: 7,
       mail_mode: "instantané",
       mail_jour: 1,
@@ -4361,10 +4381,7 @@ function openNewSupplierModal() {
       close();
       await loadFournisseurs();
       render();
-      showToast(`✓ Fournisseur ${nameVal} créé`);
-      setTimeout(() => {
-        showToast(`⚠ Coche une catégorie (Blank/Preshape/Accessoires) sur la fiche ${nameVal} pour qu'il apparaisse dans les étapes`, 5000);
-      }, 2800);
+      showToast(`✓ Fournisseur ${nameVal} créé (${categoriesArr.length} catégorie${categoriesArr.length>1?"s":""})`);
     } catch (err) {
       console.error(err);
       showToast("⚠ Création échouée : " + (err.message || err));
