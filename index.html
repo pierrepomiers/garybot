@@ -2667,7 +2667,7 @@ function buildInitialSupplierItems(order) {
     const dt = l.display_type;
     if (dt === "line_section") { current = null; continue; }
     if (dt === "line_note") {
-      if (current) {
+      if (current && current.labelParts.length === 0) {
         const noteText = (l.name || "").trim();
         if (noteText) current.labelParts.push(noteText);
       }
