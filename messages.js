@@ -17,6 +17,18 @@ On se tient au courant de la suite !
 
 L'équipe NOTOX.`,
 
+  remerciement: (prenom, ref) => `Bonjour ${prenom},
+
+Merci pour la commande et la confiance accordée à NOTOX !
+
+La planche NOTOX ${ref} va maintenant prendre forme dans notre atelier. Pendant la fabrication, des photos seront envoyées régulièrement pour suivre l'avancement du travail.
+
+On met tout en œuvre pour que cette nouvelle planche accompagne longtemps de belles sessions.
+
+À bientôt,
+
+L'équipe NOTOX.`,
+
   livraison: (prenom, ref) => `Bonjour ${prenom},
 
 La planche est prête ! La commande NOTOX ${ref} est terminée.
@@ -40,6 +52,18 @@ Your NOTOX order ${ref} is coming along nicely — we're now ${progress}% of the
 Right now, we're working on the ${stepLabel} of your board.
 
 We'll keep you posted as things move forward!
+
+Talk soon,
+
+The NOTOX team 🤙`,
+
+  remerciement: (firstName, ref) => `Hello ${firstName},
+
+Thank you for your order and for trusting NOTOX!
+
+Your NOTOX board ${ref} is now about to take shape in our workshop. During the build, we'll send photos regularly so you can follow the work as it progresses.
+
+We're putting all our care into making this new board a companion for many great sessions to come.
 
 Talk soon,
 

@@ -9,8 +9,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="messages.js?v=1777561112"></script>
-<script src="supplier_templates.js?v=1777561112"></script>
+<script src="messages.js?v=1781245738"></script>
+<script src="supplier_templates.js?v=1781245738"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -904,6 +904,7 @@ const STEP_TO_CATEGORY = {
 // ÉTAPES
 // ══════════════════════════════════════════════════════════════════════════════
 const STEPS = [
+  { id:"remerciement", label:"Remerciement",  fourn:null, clientMail:true  },
   { id:"appro_blank",  label:"Appro. Blank",  clientMail:false },
   { id:"cmd_preshape", label:"Cmd. Preshape", clientMail:false },
   { id:"cmd_access",   label:"Cmd. Access.",  clientMail:false },
@@ -918,6 +919,15 @@ const STEPS = [
   { id:"emballage",    label:"emballage",     fourn:null, clientMail:true  },
   { id:"livraison",    label:"livraison",     fourn:null, clientMail:true, isLivraison:true },
 ];
+
+// Étape "Remerciement" (mail de bienvenue) : non rétroactive. Seules les commandes
+// dont la date Odoo est postérieure au déploiement de la feature l'affichent ;
+// les commandes existantes gardent leur workflow inchangé. Comparaison de chaînes
+// ISO (date_order = "YYYY-MM-DD HH:MM:SS") → lexicographiquement correcte.
+const WELCOME_STEP_SINCE = "2026-06-12";
+function orderHasWelcomeStep(order) {
+  return !!order?.date_order && order.date_order >= WELCOME_STEP_SINCE;
+}
 
 // Retourne la liste des fournisseurs (objets de S.suppliersByKey) à proposer
 // pour une étape donnée. Filtre par catégorie + actif. Retourne [] pour les
@@ -1436,7 +1446,7 @@ function getProgress(orderId) {
   // Seules les étapes de production comptent dans la progression.
   // facturation et livraison sont traçables via leurs pastilles À FACTURER 💰 et À VALIDER 📦,
   // mais n'affectent plus le pourcentage : la commande est "finie côté prod" dès post_cuisson.
-  const NON_PROGRESS_STEPS = new Set(["facturation", "livraison"]);
+  const NON_PROGRESS_STEPS = new Set(["remerciement", "facturation", "livraison"]);
   const EMBALLAGE_WEIGHT = 0.5;
   const applicable = STEPS.filter(s =>
     !NON_PROGRESS_STEPS.has(s.id) && (s.id !== "emballage" || hasShip)
@@ -1532,12 +1542,16 @@ function buildClientMessageDefaults(order, stepLabel, stepId, progress, lang = "
     label = STEP_LABEL_EN[stepId] || stepLabel;
     subject = stepId === "livraison"
       ? `Your NOTOX board ${ref} is ready! 🤙`
+      : stepId === "remerciement"
+      ? `Your NOTOX order ${ref} – thank you! 🤙`
       : `Your NOTOX board ${ref} – ${label} in progress!`;
     templates = typeof MESSAGES_EN !== "undefined" ? MESSAGES_EN : null;
   } else {
     label = stepLabel;
     subject = stepId === "livraison"
       ? `Commande NOTOX ${ref} – prête !`
+      : stepId === "remerciement"
+      ? `Commande NOTOX ${ref} – merci pour la commande ! 🤙`
       : `Commande NOTOX ${ref} – ${stepLabel} en cours !`;
     templates = typeof MESSAGES !== "undefined" ? MESSAGES : null;
   }
@@ -3798,7 +3812,11 @@ function renderCard(order) {
 
   const hasShip = orderHasShipLine(order);
   const odooOrderUrl = `${CONFIG.odooWebUrl}/web#id=${oid}&model=sale.order&view_type=form`;
-  const stepsHtml = STEPS.filter(step => step.id !== "emballage" || hasShip).map(step => {
+  const showWelcome = orderHasWelcomeStep(order);
+  const stepsHtml = STEPS.filter(step =>
+    (step.id !== "emballage" || hasShip) &&
+    (step.id !== "remerciement" || showWelcome)
+  ).map(step => {
     const check  = (S.steps[oid]||{})[step.id]||{};
     const isDone = !!check.done;
 
