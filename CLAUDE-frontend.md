@@ -153,6 +153,19 @@ Philosophie : GaryBot ne lit pas Odoo en temps réel mais **incite** le passage 
 
 Clés **distinctes** dans le JSON `order_meta.emails_sent` : `facturation_click` et `livraison_click`. Ne PAS confondre avec les clés `facturation` / `livraison` qui traceraient un envoi mail client réel via `recordClientEmailSent` (`facturation` n'a de toute façon pas `clientMail:true`). Helper dédié : `recordOdooPastilleClick(order, key)` — **sémantique "date de validation initiale"** : seul le premier clic fixe la date, les clics suivants ré-ouvrent Odoo mais n'écrasent pas le timestamp.
 
+## Archivage des commandes (+ validation livraison Odoo, depuis 2026-09-30)
+
+- Case `livraison` cochée → `S.archivePending` → bannière « ✅ Livraison cochée — archiver dans Nj ? » (Archiver / Annuler).
+- **Archivage manuel** (bouton Archiver) → `archiveWithOdooDelivery(oid)` :
+  - case « ✅ Valider la livraison dans Odoo » **cochée par défaut** (décochage mémorisé en mémoire dans `DELIVER_UI.optOut`, non persisté) ;
+  - cochée → `POST ${backendUrl}/orders/${oid}/deliver` **avant** `archiveOrder` (écriture Supabase) ;
+  - succès → `archiveOrder` + toast « ✅ Livraison validée dans Odoo (WH/OUT/…) » (ou « déjà validée », ou « aucun BL ») ; `warnings` backend (ex. stock négatif) → `alert()` ;
+  - échec (409 contrôle, 502 Odoo, réseau, timeout 90 s) → **pas d'archivage**, message dans la bannière (`DELIVER_UI.errors`) + bouton « Archiver quand même sans valider » (`data-archive-force` → `archiveOrder` direct) ;
+  - cold start Render : bouton désactivé avec spinner (`DELIVER_UI.busy`), libellé « Réveil du serveur… » après 5 s, anti double clic.
+- **Auto-archive** (`checkAutoArchive`, après `archive_delay_days`) appelle `archiveOrder(id, true)` directement : **ne valide jamais rien dans Odoo**. Ne pas brancher `/deliver` dans `archiveOrder`.
+- Après validation Odoo, `delivery_status = full` → la commande sort de `GET /orders` à la sync suivante (disparaît aussi de la liste « Commandes archivées » des Réglages ; `order_meta` reste jusqu'à la purge). Comportement accepté.
+- Détail backend : `CLAUDE-backend.md` §13.
+
 ## Flow envoi message client
 
 1. User coche une étape avec `clientMail:true` (défini dans `STEPS`, ligne ~402)

@@ -279,6 +279,17 @@ header {
   background:rgba(239,68,68,.12); border:1px solid rgba(239,68,68,.25);
   color:var(--red); font-family:var(--mono);
 }
+.archive-confirm-btn:disabled, .archive-cancel-btn:disabled { opacity:.55; cursor:wait; }
+.archive-confirm-btn .spinner-xs {
+  display:inline-block; width:10px; height:10px; vertical-align:-1px; margin-right:4px;
+  border:2px solid rgba(74,222,128,.25); border-top-color:var(--green); border-radius:50%; animation:spin .7s linear infinite;
+}
+.archive-deliver-opt { flex-basis:100%; display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text); font-family:var(--mono); }
+.archive-deliver-opt input { width:18px; height:18px; accent-color:var(--green); }
+.archive-deliver-error {
+  flex-basis:100%; display:flex; flex-direction:column; align-items:flex-start; gap:8px;
+  font-size:12px; color:var(--red); font-family:var(--mono); word-break:break-word;
+}
 
 /* ── LOGIN ── */
 #login-screen { flex:1; display:flex; align-items:center; justify-content:center; padding:24px; }
@@ -1287,6 +1298,52 @@ async function unarchiveOrder(orderId) {
   const order = S.orders.find(o => o.id === orderId);
   await sb.from("order_meta").upsert({ order_id:orderId, order_name:order?.name||"", archived:false }, { onConflict:"order_id" });
   render();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ARCHIVAGE MANUEL + VALIDATION LIVRAISON ODOO
+// Bouton « Archiver » de la bannière uniquement. L'auto-archive (checkAutoArchive)
+// appelle archiveOrder directement et ne valide jamais rien dans Odoo.
+// Case cochée → POST /orders/{id}/deliver AVANT l'écriture Supabase ;
+// échec → pas d'archivage, erreur dans la bannière + « Archiver quand même ».
+// ══════════════════════════════════════════════════════════════════════════════
+const DELIVER_UI = { busy:new Map(), errors:new Map(), optOut:new Set() }; // busy: oid → libellé bouton
+const DELIVER_TIMEOUT_MS = 90000; // cold start Render (~30 s) + validation Odoo
+
+async function archiveWithOdooDelivery(orderId) {
+  if (DELIVER_UI.busy.has(orderId)) return; // anti double clic
+  DELIVER_UI.errors.delete(orderId);
+  if (DELIVER_UI.optOut.has(orderId)) return archiveOrder(orderId);
+
+  DELIVER_UI.busy.set(orderId, "Validation Odoo…"); render();
+  const wakeTimer = setTimeout(() => {
+    if (DELIVER_UI.busy.has(orderId)) { DELIVER_UI.busy.set(orderId, "Réveil du serveur…"); render(); }
+  }, 5000);
+  const ctrl = new AbortController();
+  const abortTimer = setTimeout(() => ctrl.abort(), DELIVER_TIMEOUT_MS);
+  let out = null, error = null;
+  try {
+    const resp = await fetch(`${CONFIG.backendUrl}/orders/${orderId}/deliver`, {
+      method:"POST", headers:{ "x-api-secret":CONFIG.apiSecret }, signal:ctrl.signal,
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (resp.ok) out = data;
+    else error = (data.detail && typeof data.detail === "object" ? data.detail.message : data.detail) || `HTTP ${resp.status}`;
+  } catch(e) {
+    error = e.name === "AbortError" ? `pas de réponse du serveur après ${DELIVER_TIMEOUT_MS/1000} s` : `réseau (${e.message})`;
+  } finally {
+    clearTimeout(wakeTimer); clearTimeout(abortTimer);
+    DELIVER_UI.busy.delete(orderId);
+  }
+  if (error) { DELIVER_UI.errors.set(orderId, error); render(); return; }
+
+  await archiveOrder(orderId);
+  document.querySelectorAll(".toast").forEach(t => t.remove()); // remplace le toast « archivée »
+  if (out.validated.length)         showToast(`✅ Livraison validée dans Odoo (${out.validated.join(", ")})`, 4000);
+  else if (out.already_done.length) showToast(`✅ Livraison déjà validée dans Odoo (${out.already_done.join(", ")})`, 4000);
+  else                              showToast("📦 Archivée — aucun BL dans Odoo", 4000);
+  const warns = (out.warnings || []).filter(w => !w.startsWith("aucun BL"));
+  if (warns.length) alert("⚠ " + warns.join("\n"));
 }
 
 // Supprime toutes les traces d'une liste de commandes purgées.
@@ -3790,13 +3847,19 @@ function renderCard(order) {
     return `<div class="line-item"><strong>${label}</strong> × ${l.product_uom_qty} — ${fmtAmount(l.price_subtotal)}</div>`;
   }).join("") + (order.lines_detail?.length>6?`<div class="line-item" style="color:var(--muted)">+${order.lines_detail.length-6} autres...</div>`:"");
 
+  const deliverBusy = DELIVER_UI.busy.get(oid);
+  const deliverErr  = DELIVER_UI.errors.get(oid);
   const archiveBanner = isPending ? `
     <div class="archive-banner">
       <span class="archive-banner-text">✅ Livraison cochée — archiver dans ${S.settings.archive_delay_days}j ?</span>
       <div style="display:flex;gap:6px;">
-        <button class="archive-confirm-btn" data-archive="${oid}">Archiver</button>
-        <button class="archive-cancel-btn" data-unarchive="${oid}">Annuler</button>
+        <button class="archive-confirm-btn" data-archive="${oid}"${deliverBusy?" disabled":""}>${deliverBusy?`<span class="spinner-xs"></span>${deliverBusy}`:"Archiver"}</button>
+        <button class="archive-cancel-btn" data-unarchive="${oid}"${deliverBusy?" disabled":""}>Annuler</button>
       </div>
+      <label class="archive-deliver-opt"><input type="checkbox" data-deliver-check="${oid}"${DELIVER_UI.optOut.has(oid)?"":" checked"}${deliverBusy?" disabled":""}> ✅ Valider la livraison dans Odoo</label>
+      ${deliverErr?`<div class="archive-deliver-error">⚠ Odoo : ${escapeHtml(deliverErr)}
+        <button class="archive-cancel-btn" data-archive-force="${oid}">Archiver quand même sans valider</button>
+      </div>`:""}
     </div>` : "";
 
   const phone = part.phone || "";
@@ -4195,10 +4258,23 @@ function bindOrderCards() {
     setMeta(parseInt(input.dataset.oid), input.dataset.metaField, input.value);
   }));
   document.querySelectorAll("[data-archive]").forEach(btn=>btn.addEventListener("click", e=>{
-    e.stopPropagation(); archiveOrder(parseInt(btn.dataset.archive));
+    e.stopPropagation(); archiveWithOdooDelivery(parseInt(btn.dataset.archive));
+  }));
+  document.querySelectorAll("[data-archive-force]").forEach(btn=>btn.addEventListener("click", e=>{
+    e.stopPropagation();
+    const oid = parseInt(btn.dataset.archiveForce);
+    DELIVER_UI.errors.delete(oid);
+    archiveOrder(oid);
+  }));
+  document.querySelectorAll(".archive-deliver-opt").forEach(el=>el.addEventListener("click", e=>e.stopPropagation()));
+  document.querySelectorAll("[data-deliver-check]").forEach(cb=>cb.addEventListener("change", ()=>{
+    const oid = parseInt(cb.dataset.deliverCheck);
+    if (cb.checked) DELIVER_UI.optOut.delete(oid); else DELIVER_UI.optOut.add(oid);
   }));
   document.querySelectorAll("[data-unarchive]").forEach(btn=>btn.addEventListener("click", e=>{
-    e.stopPropagation(); unarchiveOrder(parseInt(btn.dataset.unarchive));
+    e.stopPropagation();
+    DELIVER_UI.errors.delete(parseInt(btn.dataset.unarchive));
+    unarchiveOrder(parseInt(btn.dataset.unarchive));
   }));
   document.querySelectorAll("[data-pdf-oid]").forEach(btn=>btn.addEventListener("click", e=>{
     e.stopPropagation();
