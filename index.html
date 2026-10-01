@@ -888,7 +888,6 @@ const CONFIG = {
 
 // Délais par défaut (en jours) si app_settings n'est pas disponible.
 // Les valeurs effectives sont chargées depuis Supabase dans S.settings via loadSettings().
-const DEFAULT_ARCHIVE_DELAY_DAYS = 15;
 const DEFAULT_PURGE_DELAY_DAYS = 30;
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -978,7 +977,7 @@ let S = {
   // Alimenté depuis supplier_messages_log (seulement les lignes avec order_id + step_id renseignés).
   sendHistoryIndex: new Map(),
   // Délais (chargés depuis app_settings, fallback sur DEFAULT_*)
-  settings: { archive_delay_days: DEFAULT_ARCHIVE_DELAY_DAYS, purge_delay_days: DEFAULT_PURGE_DELAY_DAYS },
+  settings: { purge_delay_days: DEFAULT_PURGE_DELAY_DAYS },
   // Ordres de tri figés pendant une session de vue (évite les sauts de cartes
   // quand on ajoute une ligne / coche une étape). Réinitialisés au changement
   // de vue (cf. render()) et au sync manuel (cf. sync-btn). null = recalcul lazy.
@@ -1031,9 +1030,12 @@ async function checkSession() {
 // ══════════════════════════════════════════════════════════════════════════════
 async function loadAll() {
   S.loading = true; render();
-  // Settings chargés en premier : checkAutoArchive/checkAutoPurge (appelés dans syncOdoo) en dépendent.
+  // Settings chargés en premier : checkAutoPurge (appelé dans syncOdoo) en dépend.
   await loadSettings();
   await Promise.all([loadFournisseurs(), loadStepsAndMeta(), syncOdoo(), loadSupplierCart(), loadSupplierSendHistory()]);
+  // syncOdoo et loadStepsAndMeta tournent en parallèle : S.steps peut être vide lors
+  // du restore fait dans syncOdoo, on le rejoue une fois tout chargé.
+  restoreArchivePending();
   S.loading = false; render();
 }
 
@@ -1042,7 +1044,6 @@ async function loadSettings() {
     const { data, error } = await sb.from("app_settings").select("*").eq("id", 1).maybeSingle();
     if (error) { console.warn("loadSettings:", error); return; }
     if (data) {
-      S.settings.archive_delay_days = data.archive_delay_days ?? S.settings.archive_delay_days;
       S.settings.purge_delay_days   = data.purge_delay_days   ?? S.settings.purge_delay_days;
     }
   } catch (e) {
@@ -1243,8 +1244,8 @@ async function syncOdoo() {
         S.meta[o.id] = { delivery_type:null, priority:"normal", archived:false, emails_sent:{} };
       }
     }
-    // Vérifier archivages et purges automatiques
-    await checkAutoArchive();
+    // Bannières d'archivage + purge automatique
+    restoreArchivePending();
     await checkAutoPurge();
   } catch(e) {
     console.error(e);
@@ -1254,30 +1255,14 @@ async function syncOdoo() {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// ARCHIVAGE AUTOMATIQUE
-// Déclenché quand livraison est cochée. Archivage effectif après S.settings.archive_delay_days jours.
+// BANNIÈRES D'ARCHIVAGE
+// Archivage manuel uniquement (pas d'auto-archive). Après un chargement / sync,
+// on réaffiche la bannière des commandes non archivées dont livraison est cochée.
 // ══════════════════════════════════════════════════════════════════════════════
-async function checkAutoArchive() {
+function restoreArchivePending() {
   for (const o of S.orders) {
-    const meta = S.meta[o.id];
-    if (!meta || meta.archived) continue;
-    const livraisonStep = (S.steps[o.id] || {})["livraison"];
-    if (!livraisonStep?.done) continue;
-
-    // Récupérer la date de cochage depuis Supabase
-    const { data } = await sb.from("order_steps")
-      .select("done_at").eq("order_id", o.id).eq("step_id", "livraison").single();
-    if (!data?.done_at) continue;
-
-    const doneAt = new Date(data.done_at);
-    const diffDays = (Date.now() - doneAt.getTime()) / (1000 * 60 * 60 * 24);
-    if (diffDays >= S.settings.archive_delay_days) {
-      // Archivage automatique
-      await archiveOrder(o.id, true);
-    } else {
-      // En attente — afficher la bannière de confirmation
-      S.archivePending.add(o.id);
-    }
+    if (S.meta[o.id]?.archived) continue;
+    if ((S.steps[o.id] || {})["livraison"]?.done) S.archivePending.add(o.id);
   }
 }
 
@@ -1302,8 +1287,7 @@ async function unarchiveOrder(orderId) {
 
 // ══════════════════════════════════════════════════════════════════════════════
 // ARCHIVAGE MANUEL + VALIDATION LIVRAISON ODOO
-// Bouton « Archiver » de la bannière uniquement. L'auto-archive (checkAutoArchive)
-// appelle archiveOrder directement et ne valide jamais rien dans Odoo.
+// Bouton « Archiver » de la bannière (seul point d'archivage, pas d'auto-archive).
 // Case cochée → POST /orders/{id}/deliver AVANT l'écriture Supabase ;
 // échec → pas d'archivage, erreur dans la bannière + « Archiver quand même ».
 // ══════════════════════════════════════════════════════════════════════════════
@@ -1328,9 +1312,16 @@ async function archiveWithOdooDelivery(orderId) {
     });
     const data = await resp.json().catch(() => ({}));
     if (resp.ok) out = data;
-    else error = (data.detail && typeof data.detail === "object" ? data.detail.message : data.detail) || `HTTP ${resp.status}`;
+    else {
+      const detail = (data.detail && typeof data.detail === "object" ? data.detail.message : data.detail) || `HTTP ${resp.status}`;
+      console.error("[deliver] erreur backend", resp.status, data);
+      error = `⚠️ Odoo : ${detail}`;
+    }
   } catch(e) {
-    error = e.name === "AbortError" ? `pas de réponse du serveur après ${DELIVER_TIMEOUT_MS/1000} s` : `réseau (${e.message})`;
+    console.error("[deliver] erreur réseau", e);
+    error = e.name === "AbortError"
+      ? `⚠️ Le serveur ne répond pas (${DELIVER_TIMEOUT_MS/1000} s) — réessaie ou archive sans valider`
+      : "⚠️ Pas de connexion au serveur — réessaie ou archive sans valider";
   } finally {
     clearTimeout(wakeTimer); clearTimeout(abortTimer);
     DELIVER_UI.busy.delete(orderId);
@@ -3851,13 +3842,13 @@ function renderCard(order) {
   const deliverErr  = DELIVER_UI.errors.get(oid);
   const archiveBanner = isPending ? `
     <div class="archive-banner">
-      <span class="archive-banner-text">✅ Livraison cochée — archiver dans ${S.settings.archive_delay_days}j ?</span>
+      <span class="archive-banner-text">✅ Livraison cochée — archiver la commande ?</span>
+      <label class="archive-deliver-opt"><input type="checkbox" data-deliver-check="${oid}"${DELIVER_UI.optOut.has(oid)?"":" checked"}${deliverBusy?" disabled":""}> Valider la livraison dans Odoo</label>
       <div style="display:flex;gap:6px;">
         <button class="archive-confirm-btn" data-archive="${oid}"${deliverBusy?" disabled":""}>${deliverBusy?`<span class="spinner-xs"></span>${deliverBusy}`:"Archiver"}</button>
         <button class="archive-cancel-btn" data-unarchive="${oid}"${deliverBusy?" disabled":""}>Annuler</button>
       </div>
-      <label class="archive-deliver-opt"><input type="checkbox" data-deliver-check="${oid}"${DELIVER_UI.optOut.has(oid)?"":" checked"}${deliverBusy?" disabled":""}> ✅ Valider la livraison dans Odoo</label>
-      ${deliverErr?`<div class="archive-deliver-error">⚠ Odoo : ${escapeHtml(deliverErr)}
+      ${deliverErr?`<div class="archive-deliver-error">${escapeHtml(deliverErr)}
         <button class="archive-cancel-btn" data-archive-force="${oid}">Archiver quand même sans valider</button>
       </div>`:""}
     </div>` : "";
@@ -4105,19 +4096,14 @@ function renderSettings() {
       <div class="section-title">ARCHIVAGE & PURGE</div>
       <div class="fo-grid">
         <div>
-          <label class="fo-label">Délai d'archivage (jours)</label>
-          <input class="form-input" id="setting-archive-days" type="number" min="1" max="365" value="${S.settings.archive_delay_days}">
-        </div>
-        <div>
           <label class="fo-label">Délai de purge (jours, après archivage)</label>
           <input class="form-input" id="setting-purge-days" type="number" min="1" max="3650" value="${S.settings.purge_delay_days}">
         </div>
       </div>
-      <div id="settings-delay-warning" style="display:${S.settings.archive_delay_days > S.settings.purge_delay_days ? "" : "none"};font-size:12px;color:#ff9800;margin-top:6px;">⚠ Délai d'archivage supérieur au délai de purge : configuration inhabituelle.</div>
       <div style="margin-top:10px; display:flex; gap:8px;">
-        <button class="btn-save" id="save-delays-btn">💾 Enregistrer les délais</button>
+        <button class="btn-save" id="save-delays-btn">💾 Enregistrer le délai</button>
       </div>
-      <div class="purge-info" style="margin-top:14px;">Les commandes sont archivées automatiquement ${S.settings.archive_delay_days} jours après la livraison cochée, puis purgées automatiquement ${S.settings.purge_delay_days} jours après archivage. La purge supprime aussi le panier fournisseur et l'historique mails associés (elles restent dans Odoo).</div>
+      <div class="purge-info" style="margin-top:14px;">Les commandes sont archivées manuellement (bouton « Archiver » après la livraison cochée), puis purgées automatiquement ${S.settings.purge_delay_days} jours après archivage. La purge supprime aussi le panier fournisseur et l'historique mails associés (elles restent dans Odoo).</div>
       ${archivedCount>0
         ? `<div style="font-size:13px;color:var(--muted);margin-bottom:10px;">${archivedCount} commande(s) archivée(s) en attente de purge.</div>
            <button class="btn-danger" id="purge-btn">🗑 Purger les archivées (${archivedCount})</button>`
@@ -4238,11 +4224,8 @@ function bindOrderCards() {
     const currentDone = (S.steps[oid]||{})[stepId]?.done||false;
     // Facturation : uniquement via la pastille "À FACTURER 💰", jamais via la case.
     if (stepId === "facturation") return;
-    // Livraison : pastille "À VALIDER 📦" universelle (passage obligé par Odoo pour clôturer).
-    // Case pas ✅ → confirm. Case déjà ✅ → décoche normale (retour en arrière rapide, pas de confirm).
-    if (stepId === "livraison" && !currentDone) {
-      if (!confirm("Tu es sûr ? Tu n'as pas validé la livraison côté Odoo.")) return;
-    }
+    // Livraison : coche directe. La validation Odoo se fait à l'archivage manuel
+    // (case « Valider la livraison dans Odoo » de la bannière, cf. archiveWithOdooDelivery).
     toggleStep(oid, stepId, currentDone);
   }));
   document.querySelectorAll("[data-type]").forEach(btn=>btn.addEventListener("click", e=>{
@@ -4493,37 +4476,23 @@ function bindSettings() {
     if(confirm("Supprimer définitivement toutes les commandes archivées de GaryBot (ainsi que leur panier et historique mails) ?")) await purgeArchived();
   });
 
-  // Délais d'archivage / purge
-  const archInput = document.getElementById("setting-archive-days");
+  // Délai de purge (archive_delay_days reste en base, inutilisé depuis la suppression de l'auto-archive)
   const purgeInput = document.getElementById("setting-purge-days");
-  const warnEl = document.getElementById("settings-delay-warning");
-  const refreshWarn = () => {
-    if (!archInput || !purgeInput || !warnEl) return;
-    const a = parseInt(archInput.value) || 0;
-    const p = parseInt(purgeInput.value) || 0;
-    warnEl.style.display = (a > p) ? "" : "none";
-  };
-  archInput?.addEventListener("input", refreshWarn);
-  purgeInput?.addEventListener("input", refreshWarn);
 
   document.getElementById("save-delays-btn")?.addEventListener("click", async () => {
-    const a = parseInt(archInput?.value);
     const p = parseInt(purgeInput?.value);
-    if (!Number.isFinite(a) || a < 1 || a > 365)  { showToast("⚠ Délai d'archivage invalide (1-365 jours)"); return; }
     if (!Number.isFinite(p) || p < 1 || p > 3650) { showToast("⚠ Délai de purge invalide (1-3650 jours)"); return; }
     const btn = document.getElementById("save-delays-btn");
     btn.disabled = true; const prev = btn.textContent; btn.textContent = "…";
     const { error } = await sb.from("app_settings").upsert(
-      { id:1, archive_delay_days:a, purge_delay_days:p, updated_at: new Date().toISOString() },
+      { id:1, purge_delay_days:p, updated_at: new Date().toISOString() },
       { onConflict: "id" }
     );
     btn.disabled = false; btn.textContent = prev;
     if (error) { console.error(error); showToast("⚠ Sauvegarde échouée : " + error.message); return; }
-    S.settings.archive_delay_days = a;
-    S.settings.purge_delay_days   = p;
-    showToast("✓ Délais enregistrés");
-    // Application immédiate : on relance archivage + purge auto.
-    await checkAutoArchive();
+    S.settings.purge_delay_days = p;
+    showToast("✓ Délai enregistré");
+    // Application immédiate : on relance la purge auto.
     await checkAutoPurge();
     render();
   });

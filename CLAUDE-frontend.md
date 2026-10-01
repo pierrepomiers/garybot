@@ -130,7 +130,7 @@ Ordre final des 13 étapes dans `const STEPS` (`index.html:583`) :
 
 ### Règle progression (depuis 2026-04-23)
 
-`getProgress` n'inclut **que les étapes de production** : `appro_blank` → `post_cuisson` (10 étapes) + `emballage` si SHIP. Les étapes administratives `facturation` et `livraison` sont **exclues du calcul** du pourcentage — elles continuent de se cocher normalement (et déclenchent leurs pastilles À FACTURER 💰 / À VALIDER 📦 + l'archivage auto pour livraison), mais n'impactent plus la barre de progression. Dénominateur effectif : **11 étapes** avec SHIP, **10 sans**. Conséquence : une commande atteint 100% dès `post_cuisson` cochée (+ `emballage` si SHIP). Le filtre board correspondant s'appelle **"Finies"** (ex-"Livrées") pour coller à cette sémantique "fini côté prod". La stat-chip "livrées" de la barre de stats compte le nombre de commandes archivées, indépendamment de la progression.
+`getProgress` n'inclut **que les étapes de production** : `appro_blank` → `post_cuisson` (10 étapes) + `emballage` si SHIP. Les étapes administratives `facturation` et `livraison` sont **exclues du calcul** du pourcentage — elles continuent de se cocher normalement (et déclenchent leurs pastilles À FACTURER 💰 / À VALIDER 📦 + la bannière d'archivage pour livraison), mais n'impactent plus la barre de progression. Dénominateur effectif : **11 étapes** avec SHIP, **10 sans**. Conséquence : une commande atteint 100% dès `post_cuisson` cochée (+ `emballage` si SHIP). Le filtre board correspondant s'appelle **"Finies"** (ex-"Livrées") pour coller à cette sémantique "fini côté prod". La stat-chip "livrées" de la barre de stats compte le nombre de commandes archivées, indépendamment de la progression.
 
 ## Pastilles Odoo "douces" — facturation & livraison
 
@@ -147,7 +147,7 @@ Philosophie : GaryBot ne lit pas Odoo en temps réel mais **incite** le passage 
 
 - Même pattern + même URL Odoo, clé timestamp `emails_sent.livraison_click`.
 - **Universelle** : rendue sur toute commande non archivée dont l'étape livraison n'est pas encore validée — passage obligé par Odoo pour clôturer (WH/OUT marqué done côté Odoo = source de vérité), indépendamment de la présence d'une ligne SHIP. L'étape `emballage`, elle, reste conditionnée à SHIP (voir règle plus haut).
-- **Case livraison semi-cliquable** : si la case n'est pas ✅, clic direct déclenche un `confirm("Tu es sûr ? Tu n'as pas validé la livraison côté Odoo.")`. Case déjà ✅ → décoche sans confirm (retour en arrière rapide).
+- **Case livraison cliquable directement** (sans confirm depuis 2026-10-01) : la validation Odoo est proposée à l'archivage manuel via la bannière (voir « Archivage des commandes »).
 
 ### Stockage timestamps clic pastille
 
@@ -155,14 +155,17 @@ Clés **distinctes** dans le JSON `order_meta.emails_sent` : `facturation_click`
 
 ## Archivage des commandes (+ validation livraison Odoo, depuis 2026-09-30)
 
-- Case `livraison` cochée → `S.archivePending` → bannière « ✅ Livraison cochée — archiver dans Nj ? » (Archiver / Annuler).
+- **Archivage manuel uniquement** (auto-archive supprimé le 2026-10-01). Case `livraison` cochée → `S.archivePending` → bannière « ✅ Livraison cochée — archiver la commande ? » (case Odoo, puis Archiver / Annuler).
+- `restoreArchivePending()` réaffiche la bannière des commandes non archivées dont livraison est cochée. Appelée dans `syncOdoo` et une fois de plus dans `loadAll` après le `Promise.all` (`syncOdoo` et `loadStepsAndMeta` tournent en parallèle). Une bannière fermée par « Annuler » revient au ⟳ suivant tant que livraison reste cochée.
 - **Archivage manuel** (bouton Archiver) → `archiveWithOdooDelivery(oid)` :
-  - case « ✅ Valider la livraison dans Odoo » **cochée par défaut** (décochage mémorisé en mémoire dans `DELIVER_UI.optOut`, non persisté) ;
+  - case « Valider la livraison dans Odoo », placée au-dessus des boutons Archiver / Annuler, **cochée par défaut** (décochage mémorisé en mémoire dans `DELIVER_UI.optOut`, non persisté) ;
   - cochée → `POST ${backendUrl}/orders/${oid}/deliver` **avant** `archiveOrder` (écriture Supabase) ;
   - succès → `archiveOrder` + toast « ✅ Livraison validée dans Odoo (WH/OUT/…) » (ou « déjà validée », ou « aucun BL ») ; `warnings` backend (ex. stock négatif) → `alert()` ;
-  - échec (409 contrôle, 502 Odoo, réseau, timeout 90 s) → **pas d'archivage**, message dans la bannière (`DELIVER_UI.errors`) + bouton « Archiver quand même sans valider » (`data-archive-force` → `archiveOrder` direct) ;
+  - échec (409 contrôle, 502 Odoo, réseau, timeout 90 s) → **pas d'archivage**, message dans la bannière (`DELIVER_UI.errors` : « ⚠️ Odoo : … » pour une erreur backend, « ⚠️ Pas de connexion au serveur — réessaie ou archive sans valider » pour une erreur réseau ; détail technique dans `console.error`) + bouton « Archiver quand même sans valider » (`data-archive-force` → `archiveOrder` direct) ;
   - cold start Render : bouton désactivé avec spinner (`DELIVER_UI.busy`), libellé « Réveil du serveur… » après 5 s, anti double clic.
-- **Auto-archive** (`checkAutoArchive`, après `archive_delay_days`) appelle `archiveOrder(id, true)` directement : **ne valide jamais rien dans Odoo**. Ne pas brancher `/deliver` dans `archiveOrder`.
+- Ne pas brancher `/deliver` dans `archiveOrder` : le bouton « Archiver quand même sans valider » l'appelle directement.
+- **Purge automatique** (`checkAutoPurge`, dans `syncOdoo` et à l'enregistrement du réglage) : supprime de Supabase les commandes dont `archived_at` dépasse `purge_delay_days` (défaut 30 j, réglable dans Réglages). Se base sur `S.meta`, donc fonctionne aussi pour les commandes sorties de `GET /orders`.
+- La colonne Supabase `app_settings.archive_delay_days` existe toujours mais n'est plus lue ni écrite.
 - Après validation Odoo, `delivery_status = full` → la commande sort de `GET /orders` à la sync suivante (disparaît aussi de la liste « Commandes archivées » des Réglages ; `order_meta` reste jusqu'à la purge). Comportement accepté.
 - Détail backend : `CLAUDE-backend.md` §13.
 
