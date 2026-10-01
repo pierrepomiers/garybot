@@ -147,7 +147,7 @@ Philosophie : GaryBot ne lit pas Odoo en temps réel mais **incite** le passage 
 
 - Même pattern + même URL Odoo, clé timestamp `emails_sent.livraison_click`.
 - **Universelle** : rendue sur toute commande non archivée dont l'étape livraison n'est pas encore validée — passage obligé par Odoo pour clôturer (WH/OUT marqué done côté Odoo = source de vérité), indépendamment de la présence d'une ligne SHIP. L'étape `emballage`, elle, reste conditionnée à SHIP (voir règle plus haut).
-- **Case livraison semi-cliquable** : si la case n'est pas ✅, clic direct déclenche un `confirm("Tu es sûr ? Tu n'as pas validé la livraison côté Odoo.")`. Case déjà ✅ → décoche sans confirm (retour en arrière rapide).
+- **Case livraison cliquable directement** (sans confirm depuis 2026-10-01) : la validation Odoo est proposée à l'archivage manuel via la bannière (voir « Archivage des commandes »).
 
 ### Stockage timestamps clic pastille
 
@@ -157,10 +157,10 @@ Clés **distinctes** dans le JSON `order_meta.emails_sent` : `facturation_click`
 
 - Case `livraison` cochée → `S.archivePending` → bannière « ✅ Livraison cochée — archiver dans Nj ? » (Archiver / Annuler).
 - **Archivage manuel** (bouton Archiver) → `archiveWithOdooDelivery(oid)` :
-  - case « ✅ Valider la livraison dans Odoo » **cochée par défaut** (décochage mémorisé en mémoire dans `DELIVER_UI.optOut`, non persisté) ;
+  - case « Valider la livraison dans Odoo », placée au-dessus des boutons Archiver / Annuler, **cochée par défaut** (décochage mémorisé en mémoire dans `DELIVER_UI.optOut`, non persisté) ;
   - cochée → `POST ${backendUrl}/orders/${oid}/deliver` **avant** `archiveOrder` (écriture Supabase) ;
   - succès → `archiveOrder` + toast « ✅ Livraison validée dans Odoo (WH/OUT/…) » (ou « déjà validée », ou « aucun BL ») ; `warnings` backend (ex. stock négatif) → `alert()` ;
-  - échec (409 contrôle, 502 Odoo, réseau, timeout 90 s) → **pas d'archivage**, message dans la bannière (`DELIVER_UI.errors`) + bouton « Archiver quand même sans valider » (`data-archive-force` → `archiveOrder` direct) ;
+  - échec (409 contrôle, 502 Odoo, réseau, timeout 90 s) → **pas d'archivage**, message dans la bannière (`DELIVER_UI.errors` : « ⚠️ Odoo : … » pour une erreur backend, « ⚠️ Pas de connexion au serveur — réessaie ou archive sans valider » pour une erreur réseau ; détail technique dans `console.error`) + bouton « Archiver quand même sans valider » (`data-archive-force` → `archiveOrder` direct) ;
   - cold start Render : bouton désactivé avec spinner (`DELIVER_UI.busy`), libellé « Réveil du serveur… » après 5 s, anti double clic.
 - **Auto-archive** (`checkAutoArchive`, après `archive_delay_days`) appelle `archiveOrder(id, true)` directement : **ne valide jamais rien dans Odoo**. Ne pas brancher `/deliver` dans `archiveOrder`.
 - Après validation Odoo, `delivery_status = full` → la commande sort de `GET /orders` à la sync suivante (disparaît aussi de la liste « Commandes archivées » des Réglages ; `order_meta` reste jusqu'à la purge). Comportement accepté.

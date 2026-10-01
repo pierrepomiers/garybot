@@ -1328,9 +1328,16 @@ async function archiveWithOdooDelivery(orderId) {
     });
     const data = await resp.json().catch(() => ({}));
     if (resp.ok) out = data;
-    else error = (data.detail && typeof data.detail === "object" ? data.detail.message : data.detail) || `HTTP ${resp.status}`;
+    else {
+      const detail = (data.detail && typeof data.detail === "object" ? data.detail.message : data.detail) || `HTTP ${resp.status}`;
+      console.error("[deliver] erreur backend", resp.status, data);
+      error = `⚠️ Odoo : ${detail}`;
+    }
   } catch(e) {
-    error = e.name === "AbortError" ? `pas de réponse du serveur après ${DELIVER_TIMEOUT_MS/1000} s` : `réseau (${e.message})`;
+    console.error("[deliver] erreur réseau", e);
+    error = e.name === "AbortError"
+      ? `⚠️ Le serveur ne répond pas (${DELIVER_TIMEOUT_MS/1000} s) — réessaie ou archive sans valider`
+      : "⚠️ Pas de connexion au serveur — réessaie ou archive sans valider";
   } finally {
     clearTimeout(wakeTimer); clearTimeout(abortTimer);
     DELIVER_UI.busy.delete(orderId);
@@ -3852,12 +3859,12 @@ function renderCard(order) {
   const archiveBanner = isPending ? `
     <div class="archive-banner">
       <span class="archive-banner-text">✅ Livraison cochée — archiver dans ${S.settings.archive_delay_days}j ?</span>
+      <label class="archive-deliver-opt"><input type="checkbox" data-deliver-check="${oid}"${DELIVER_UI.optOut.has(oid)?"":" checked"}${deliverBusy?" disabled":""}> Valider la livraison dans Odoo</label>
       <div style="display:flex;gap:6px;">
         <button class="archive-confirm-btn" data-archive="${oid}"${deliverBusy?" disabled":""}>${deliverBusy?`<span class="spinner-xs"></span>${deliverBusy}`:"Archiver"}</button>
         <button class="archive-cancel-btn" data-unarchive="${oid}"${deliverBusy?" disabled":""}>Annuler</button>
       </div>
-      <label class="archive-deliver-opt"><input type="checkbox" data-deliver-check="${oid}"${DELIVER_UI.optOut.has(oid)?"":" checked"}${deliverBusy?" disabled":""}> ✅ Valider la livraison dans Odoo</label>
-      ${deliverErr?`<div class="archive-deliver-error">⚠ Odoo : ${escapeHtml(deliverErr)}
+      ${deliverErr?`<div class="archive-deliver-error">${escapeHtml(deliverErr)}
         <button class="archive-cancel-btn" data-archive-force="${oid}">Archiver quand même sans valider</button>
       </div>`:""}
     </div>` : "";
@@ -4238,11 +4245,8 @@ function bindOrderCards() {
     const currentDone = (S.steps[oid]||{})[stepId]?.done||false;
     // Facturation : uniquement via la pastille "À FACTURER 💰", jamais via la case.
     if (stepId === "facturation") return;
-    // Livraison : pastille "À VALIDER 📦" universelle (passage obligé par Odoo pour clôturer).
-    // Case pas ✅ → confirm. Case déjà ✅ → décoche normale (retour en arrière rapide, pas de confirm).
-    if (stepId === "livraison" && !currentDone) {
-      if (!confirm("Tu es sûr ? Tu n'as pas validé la livraison côté Odoo.")) return;
-    }
+    // Livraison : coche directe. La validation Odoo se fait à l'archivage manuel
+    // (case « Valider la livraison dans Odoo » de la bannière, cf. archiveWithOdooDelivery).
     toggleStep(oid, stepId, currentDone);
   }));
   document.querySelectorAll("[data-type]").forEach(btn=>btn.addEventListener("click", e=>{
