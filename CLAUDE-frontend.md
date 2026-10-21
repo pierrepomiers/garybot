@@ -195,6 +195,7 @@ Clés **distinctes** dans le JSON `order_meta.emails_sent` : `facturation_click`
 3. **Attention aux imports dans messages.js** : bug historique documenté dans `index.html` ligne ~736 — `const MESSAGES` dans un `<script src>` externe n'est pas attaché au `window` par défaut. Le workaround est en place, ne pas le casser.
 4. **Aucune donnée sensible côté front** : la `supabaseKey` est anon public (OK), l'`apiSecret` est connu côté serveur Render. Les données vraiment sensibles passent par Supabase RLS et le backend.
 5. **Tester sur mobile** : l'UI est pensée mobile-first, certains comportements (overlay, scroll lock) sont sensibles à iOS Safari.
+6. **Supabase (depuis le 30/10/2026)** : toute nouvelle table dans le schéma `public` doit être créée avec ses `GRANT` explicites (`select` pour `anon` si besoin ; `select, insert, update, delete` pour `authenticated` et `service_role`) ET une politique RLS, dans le même script SQL. Sinon l'API renvoie `permission denied`.
 
 ---
 
